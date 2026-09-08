@@ -1,0 +1,11 @@
+# Ensures Railway's build environment (Nixpacks) installs the system
+# libraries headless Chrome needs for PDF export (Puppeteer). Without these,
+# Puppeteer's browser.launch() fails on a minimal server image even though
+# the npm install succeeds.
+[phases.setup]
+aptPkgs = [
+  "libnss3", "libatk1.0-0", "libatk-bridge2.0-0", "libcups2",
+  "libdrm2", "libxkbcommon0", "libxcomposite1", "libxdamage1",
+  "libxfixes3", "libxrandr2", "libgbm1", "libasound2", "libpango-1.0-0",
+  "libcairo2", "libgtk-3-0"
+]

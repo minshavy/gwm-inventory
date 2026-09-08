@@ -1,0 +1,128 @@
+@import url("https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500;600;700&display=swap");
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 37.5000 36.3636% 95.6863%;
+    --foreground: 8.8889 27.8351% 19.0196%;
+
+    --card: 37.5000 36.3636% 95.6863%;
+    --card-foreground: 8.8889 27.8351% 19.0196%;
+
+    --popover: 37.5000 36.3636% 95.6863%;
+    --popover-foreground: 8.8889 27.8351% 19.0196%;
+
+    --primary: 123.0380 46.1988% 33.5294%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 124.6154 39.3939% 93.5294%;
+    --secondary-foreground: 124.4776 55.3719% 23.7255%;
+
+    --muted: 33.7500 34.7826% 90.9804%;
+    --muted-foreground: 15.0000 25.2874% 34.1176%;
+
+    --accent: 122 37.5000% 84.3137%;
+    --accent-foreground: 124.4776 55.3719% 23.7255%;
+
+    --destructive: 0 66.3866% 46.6667%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 33.9130 27.0588% 83.3333%;
+    --input: 33.9130 27.0588% 83.3333%;
+    --ring: 123.0380 46.1988% 33.5294%;
+
+    --chart-1: 122.4242 39.4422% 49.2157%;
+    --chart-2: 122.7907 43.4343% 38.8235%;
+    --chart-3: 123.0380 46.1988% 33.5294%;
+    --chart-4: 124.4776 55.3719% 23.7255%;
+    --chart-5: 125.7143 51.2195% 8.0392%;
+
+    --sidebar-background: 33.7500 34.7826% 90.9804%;
+    --sidebar-foreground: 8.8889 27.8351% 19.0196%;
+    --sidebar-primary: 123.0380 46.1988% 33.5294%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 122 37.5000% 84.3137%;
+    --sidebar-accent-foreground: 124.4776 55.3719% 23.7255%;
+    --sidebar-border: 33.9130 27.0588% 83.3333%;
+    --sidebar-ring: 123.0380 46.1988% 33.5294%;
+
+    --radius: 0.5rem;
+
+    --font-sans: 'Rubik', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+    --shadow-x: 0;
+    --shadow-y: 1px;
+    --shadow-blur: 3px;
+    --shadow-spread: 0px;
+    --shadow-opacity: 0.1;
+    --shadow-color: #000000;
+    --shadow-rgb: 0 0 0;
+
+    --shadow-2xs: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread) rgb(var(--shadow-rgb) / calc(var(--shadow-opacity) * 0.5));
+    --shadow-xs: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread) rgb(var(--shadow-rgb) / calc(var(--shadow-opacity) * 0.5));
+    --shadow-sm: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread) rgb(var(--shadow-rgb) / var(--shadow-opacity)), var(--shadow-x) calc(var(--shadow-y) / 4) calc(var(--shadow-blur) / 2) calc(var(--shadow-spread) - 1px) rgb(var(--shadow-rgb) / var(--shadow-opacity));
+    --shadow: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread) rgb(var(--shadow-rgb) / var(--shadow-opacity)), var(--shadow-x) calc(var(--shadow-y) / 2) calc(var(--shadow-blur) / 2) calc(var(--shadow-spread) - 1px) rgb(var(--shadow-rgb) / var(--shadow-opacity));
+    --shadow-md: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread) rgb(var(--shadow-rgb) / var(--shadow-opacity)), var(--shadow-x) calc(var(--shadow-y) / 2) calc(var(--shadow-blur) * 2) calc(var(--shadow-spread) - 1px) rgb(var(--shadow-rgb) / var(--shadow-opacity));
+    --shadow-lg: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread) rgb(var(--shadow-rgb) / var(--shadow-opacity)), var(--shadow-x) var(--shadow-y) calc(var(--shadow-blur) * 3) calc(var(--shadow-spread) - 1px) rgb(var(--shadow-rgb) / var(--shadow-opacity));
+    --shadow-xl: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread) rgb(var(--shadow-rgb) / var(--shadow-opacity)), var(--shadow-x) calc(var(--shadow-y) * 2) calc(var(--shadow-blur) * 5) calc(var(--shadow-spread) - 1px) rgb(var(--shadow-rgb) / var(--shadow-opacity));
+    --shadow-2xl: var(--shadow-x) var(--shadow-y) var(--shadow-blur) var(--shadow-spread) rgb(var(--shadow-rgb) / calc(var(--shadow-opacity) * 2.5));
+  }
+
+  .dark {
+    --background: 37.5000 36.3636% 95.6863%;
+    --foreground: 8.8889 27.8351% 19.0196%;
+
+    --card: 37.5000 36.3636% 95.6863%;
+    --card-foreground: 8.8889 27.8351% 19.0196%;
+
+    --popover: 37.5000 36.3636% 95.6863%;
+    --popover-foreground: 8.8889 27.8351% 19.0196%;
+
+    --primary: 123.0380 46.1988% 33.5294%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 124.6154 39.3939% 93.5294%;
+    --secondary-foreground: 124.4776 55.3719% 23.7255%;
+
+    --muted: 33.7500 34.7826% 90.9804%;
+    --muted-foreground: 15.0000 25.2874% 34.1176%;
+
+    --accent: 122 37.5000% 84.3137%;
+    --accent-foreground: 124.4776 55.3719% 23.7255%;
+
+    --destructive: 0 66.3866% 46.6667%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 33.9130 27.0588% 83.3333%;
+    --input: 33.9130 27.0588% 83.3333%;
+    --ring: 123.0380 46.1988% 33.5294%;
+
+    --chart-1: 213.1169 93.9024% 67.8431%;
+    --chart-2: 217.2193 91.2195% 59.8039%;
+    --chart-3: 221.2121 83.1933% 53.3333%;
+    --chart-4: 224.2781 76.3265% 48.0392%;
+    --chart-5: 225.9310 70.7317% 40.1961%;
+
+    --sidebar-background: 0 0% 9.0196%;
+    --sidebar-foreground: 8.8889 27.8351% 19.0196%;
+    --sidebar-primary: 123.0380 46.1988% 33.5294%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 122 37.5000% 84.3137%;
+    --sidebar-accent-foreground: 124.4776 55.3719% 23.7255%;
+    --sidebar-border: 33.9130 27.0588% 83.3333%;
+    --sidebar-ring: 123.0380 46.1988% 33.5294%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
