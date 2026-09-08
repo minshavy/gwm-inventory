@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/lib/auth-shim';
 import { Toaster } from '@project/components/ui/sonner';
 import Layout from './components/Layout';
+import SupplierLayout from './components/SupplierLayout';
 import { lazy, Suspense } from 'react';
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -16,7 +17,9 @@ const CategoriesPage = lazy(() => import('./pages/CategoriesPage'));
 const ExpenseCategoriesPage = lazy(() => import('./pages/ExpenseCategoriesPage'));
 const PaymentMethodsPage = lazy(() => import('./pages/PaymentMethodsPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
-const SupplierPortalPage = lazy(() => import('./pages/SupplierPortalPage'));
+const SupplierProductsPage = lazy(() => import('./pages/SupplierProductsPage'));
+const SupplierStockPage = lazy(() => import('./pages/SupplierStockPage'));
+const SupplierEarningsPage = lazy(() => import('./pages/SupplierEarningsPage'));
 
 function PageLoader() {
   return (
@@ -51,8 +54,12 @@ function AppRoutes() {
   if (user.role === 'supplier') {
     return (
       <Routes>
-        <Route path="/" element={<Suspense fallback={<PageLoader />}><SupplierPortalPage /></Suspense>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route element={<SupplierLayout />}>
+          <Route path="/" element={<Suspense fallback={<PageLoader />}><SupplierProductsPage /></Suspense>} />
+          <Route path="/stock" element={<Suspense fallback={<PageLoader />}><SupplierStockPage /></Suspense>} />
+          <Route path="/earnings" element={<Suspense fallback={<PageLoader />}><SupplierEarningsPage /></Suspense>} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
       </Routes>
     );
   }

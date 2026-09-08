@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getDashboard, getNotifications, markNotificationsRead } from '@/lib/api-client';
+import { getDashboard, getNotifications, markNotificationsRead, confirmStockUpdate, rejectStockUpdate } from '@/lib/api-client';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { Button } from '@project/components/ui/button';
+import { Badge } from '@project/components/ui/badge';
 import {
   Package, DollarSign, TrendingUp, TrendingDown, AlertTriangle,
-  XCircle, ShoppingCart, ArrowDown, Bell, ArrowRight,
+  XCircle, ShoppingCart, ArrowDown, Bell, ArrowRight, Check, X, Loader2,
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -21,9 +22,13 @@ const fmtShort = (n: number) => {
 
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
-function StatCard({ label, value, icon: Icon, color, sub }: { label: string; value: string | number; icon: any; color: string; sub?: string }) {
+function StatCard({ label, value, icon: Icon, color, sub, onClick }: { label: string; value: string | number; icon: any; color: string; sub?: string; onClick?: () => void }) {
+  const Comp: any = onClick ? 'button' : 'div';
   return (
-    <div className="bg-card border rounded-lg p-3 sm:p-4 flex items-start gap-2 sm:gap-3 overflow-hidden">
+    <Comp
+      onClick={onClick}
+      className={`bg-card border rounded-lg p-3 sm:p-4 flex items-start gap-2 sm:gap-3 overflow-hidden w-full text-left ${onClick ? 'cursor-pointer hover:border-primary/50 transition-colors' : ''}`}
+    >
       <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${color}`}>
         <Icon className="w-4 h-4" />
       </div>
@@ -32,7 +37,7 @@ function StatCard({ label, value, icon: Icon, color, sub }: { label: string; val
         <p className="text-xs sm:text-base font-bold truncate">{value}</p>
         {sub && <p className="text-[10px] sm:text-xs text-muted-foreground truncate">{sub}</p>}
       </div>
-    </div>
+    </Comp>
   );
 }
 
@@ -42,7 +47,9 @@ export default function DashboardPage() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notifLoading, setNotifLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [actingOn, setActingOn] = useState<string | null>(null);
   const navigate = useNavigate();
+  const stockAlertsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getDashboard({}).then(setData).finally(() => setLoading(false));
@@ -63,6 +70,31 @@ export default function DashboardPage() {
     }
     if (n.productId) navigate(`/products?edit=${n.productId}`);
   };
+
+  const handleConfirmStock = async (n: any) => {
+    setActingOn(n.id);
+    try {
+      await confirmStockUpdate({ requestId: n.requestId });
+      setNotifications(ns => ns.filter(x => x.id !== n.id));
+      setUnreadCount(c => Math.max(0, c - (n.isRead ? 0 : 1)));
+      getDashboard({}).then(setData);
+    } finally {
+      setActingOn(null);
+    }
+  };
+
+  const handleRejectStock = async (n: any) => {
+    setActingOn(n.id);
+    try {
+      await rejectStockUpdate({ requestId: n.requestId });
+      setNotifications(ns => ns.filter(x => x.id !== n.id));
+      setUnreadCount(c => Math.max(0, c - (n.isRead ? 0 : 1)));
+    } finally {
+      setActingOn(null);
+    }
+  };
+
+  const scrollToStockAlerts = () => stockAlertsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   if (loading || !data) {
     return (
@@ -87,9 +119,9 @@ export default function DashboardPage() {
   ];
 
   const productStats = [
-    { label: 'Products', value: data.totalProducts, icon: Package, color: 'bg-accent text-accent-foreground' },
-    { label: 'Low Stock', value: data.lowStockCount, icon: AlertTriangle, color: 'bg-yellow-100 text-yellow-700' },
-    { label: 'Out of Stock', value: data.outOfStockCount, icon: XCircle, color: 'bg-destructive/10 text-destructive' },
+    { label: 'Products', value: data.totalProducts, icon: Package, color: 'bg-accent text-accent-foreground', onClick: () => navigate('/products') },
+    { label: 'Low Stock', value: data.lowStockCount, icon: AlertTriangle, color: 'bg-yellow-100 text-yellow-700', onClick: scrollToStockAlerts },
+    { label: 'Out of Stock', value: data.outOfStockCount, icon: XCircle, color: 'bg-destructive/10 text-destructive', onClick: scrollToStockAlerts },
   ];
 
   return (
@@ -97,7 +129,7 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-bold">Dashboard</h1>
 
       <div className="bg-card border rounded-lg p-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <h3 className="font-semibold flex items-center gap-2">
             <Bell className="w-4 h-4 text-primary" />
             Supplier Activity
@@ -111,19 +143,42 @@ export default function DashboardPage() {
           <p className="text-sm text-muted-foreground py-2">You don't have any new notifications from suppliers right now.</p>
         ) : (
           <div className="space-y-1.5">
-            {notifications.slice(0, 8).map(n => (
-              <button
-                key={n.id}
-                onClick={() => handleReviewProduct(n)}
-                className={`w-full flex items-center justify-between gap-3 p-2.5 rounded border text-left transition-colors hover:bg-muted/50 ${!n.isRead ? 'bg-primary/5 border-primary/20' : 'bg-transparent'}`}
-              >
-                <div className="min-w-0">
-                  <p className="text-sm truncate">{n.message}</p>
-                  <p className="text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString()}</p>
-                </div>
-                <span className="flex items-center gap-1 text-xs text-primary flex-shrink-0 font-medium">Review <ArrowRight className="w-3.5 h-3.5" /></span>
-              </button>
-            ))}
+            {notifications.slice(0, 8).map(n => {
+              if (n.type === 'stock_request') {
+                return (
+                  <div
+                    key={n.id}
+                    className={`w-full flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-2.5 rounded border ${!n.isRead ? 'bg-primary/5 border-primary/20' : 'bg-transparent'}`}
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm">{n.message}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString()}</p>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button size="sm" className="flex-1 sm:flex-none" disabled={actingOn === n.id} onClick={() => handleConfirmStock(n)}>
+                        {actingOn === n.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Check className="w-3.5 h-3.5 mr-1" /> Confirm</>}
+                      </Button>
+                      <Button size="sm" variant="outline" className="flex-1 sm:flex-none" disabled={actingOn === n.id} onClick={() => handleRejectStock(n)}>
+                        <X className="w-3.5 h-3.5 mr-1" /> Reject
+                      </Button>
+                    </div>
+                  </div>
+                );
+              }
+              return (
+                <button
+                  key={n.id}
+                  onClick={() => handleReviewProduct(n)}
+                  className={`w-full flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 p-2.5 rounded border text-left transition-colors hover:bg-muted/50 ${!n.isRead ? 'bg-primary/5 border-primary/20' : 'bg-transparent'}`}
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm break-words">{n.message}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString()}</p>
+                  </div>
+                  <span className="flex items-center gap-1 text-xs text-primary flex-shrink-0 font-medium self-end sm:self-auto">Review <ArrowRight className="w-3.5 h-3.5" /></span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -216,25 +271,36 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Low stock alert */}
-      {data.lowStockProducts.length > 0 && (
-        <div className="bg-card border rounded-lg p-4">
-          <h3 className="font-semibold mb-3 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-yellow-600" />
-            Low Stock Alert
-          </h3>
+      {/* Stock alerts — Low Stock & Out of Stock */}
+      <div ref={stockAlertsRef} className="bg-card border rounded-lg p-4 scroll-mt-4">
+        <h3 className="font-semibold mb-3 flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-yellow-600" />
+          Stock Alerts
+        </h3>
+        {data.stockAlerts.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-2">There are no low or out of stock products at the moment.</p>
+        ) : (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {data.lowStockProducts.map((p: any) => (
-              <div key={p.id} className="flex items-center justify-between p-2 rounded border bg-muted/30">
+            {data.stockAlerts.map((p: any) => (
+              <button
+                key={p.id}
+                onClick={() => navigate(`/products?edit=${p.id}`)}
+                className="flex items-center justify-between gap-2 p-2 rounded border bg-muted/30 hover:bg-muted/60 transition-colors text-left"
+              >
                 <span className="text-sm font-medium truncate">{p.name}</span>
-                <span className={`text-sm font-bold ${p.currentStock <= 0 ? 'text-destructive' : 'text-yellow-600'}`}>
-                  {p.currentStock} / {p.lowStockThreshold}
+                <span className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`text-sm font-bold ${p.stockFlag === 'Out of Stock' ? 'text-destructive' : 'text-yellow-600'}`}>
+                    {p.currentStock} / {p.lowStockThreshold}
+                  </span>
+                  <Badge variant={p.stockFlag === 'Out of Stock' ? 'destructive' : undefined} className={p.stockFlag !== 'Out of Stock' ? 'bg-yellow-500 hover:bg-yellow-500 text-white' : ''}>
+                    {p.stockFlag === 'Out of Stock' ? 'Out' : 'Low'}
+                  </Badge>
                 </span>
-              </div>
+              </button>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

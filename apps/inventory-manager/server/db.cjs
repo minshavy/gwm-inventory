@@ -104,7 +104,21 @@ function init() {
       isRead INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS "StockUpdateRequests" (
+      id TEXT PRIMARY KEY,
+      productId TEXT,
+      supplierId TEXT,
+      previousStock INTEGER,
+      requestedStock INTEGER,
+      status TEXT DEFAULT 'pending', -- pending | confirmed | rejected
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `);
+
+  // Migration: notifications about a stock request carry the request id so
+  // the Dashboard can render Confirm/Reject actions inline.
+  ensureColumn('Notifications', 'requestId', 'requestId TEXT');
 
   // Migration: track which product came from a supplier login (vs admin).
   ensureColumn('Products', 'createdByUserId', 'createdByUserId TEXT');

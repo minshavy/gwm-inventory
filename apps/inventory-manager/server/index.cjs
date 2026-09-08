@@ -72,9 +72,51 @@ app.post('/api/auth/changePassword', (req, res) => {
   res.json({ success: true });
 });
 
+// ---------- Admin: confirm/reject a supplier's stock update ----------
+app.post('/api/admin/confirmStockUpdate', requireAdmin, (req, res) => {
+  const { requestId } = req.body || {};
+  const request = db.prepare(`SELECT * FROM "StockUpdateRequests" WHERE id = ?`).get(requestId);
+  if (!request) return res.status(400).json({ error: 'Request not found' });
+  if (request.status !== 'pending') return res.status(400).json({ error: 'This request was already handled' });
+
+  db.prepare(`UPDATE "Products" SET currentStock=?, status=? WHERE id=?`)
+    .run(request.requestedStock, request.requestedStock <= 0 ? 'Out of Stock' : 'Active', request.productId);
+
+  const delta = request.requestedStock - request.previousStock;
+  if (delta !== 0) {
+    const moveId = uuid();
+    const ref = nextCounter('StockMovements', 'reference');
+    db.prepare(`
+      INSERT INTO "StockMovements" (id, reference, type, quantity, notes, recordedBy) VALUES (?,?,?,?,?,?)
+    `).run(moveId, ref, delta > 0 ? 'Stock In' : 'Stock Out', Math.abs(delta), 'Confirmed supplier restock', req.user.username);
+    db.prepare(`INSERT INTO "ProductsStockMovements" (productsId, stockMovementsId) VALUES (?,?)`).run(request.productId, moveId);
+    if (request.supplierId) db.prepare(`INSERT INTO "StockMovementsSuppliers" (stockMovementsId, suppliersId) VALUES (?,?)`).run(moveId, request.supplierId);
+  }
+
+  db.prepare(`UPDATE "StockUpdateRequests" SET status='confirmed' WHERE id=?`).run(requestId);
+  db.prepare(`DELETE FROM "Notifications" WHERE requestId=?`).run(requestId);
+  res.json({ success: true });
+});
+
+app.post('/api/admin/rejectStockUpdate', requireAdmin, (req, res) => {
+  const { requestId } = req.body || {};
+  const request = db.prepare(`SELECT * FROM "StockUpdateRequests" WHERE id = ?`).get(requestId);
+  if (!request) return res.status(400).json({ error: 'Request not found' });
+  if (request.status !== 'pending') return res.status(400).json({ error: 'This request was already handled' });
+  db.prepare(`UPDATE "StockUpdateRequests" SET status='rejected' WHERE id=?`).run(requestId);
+  db.prepare(`DELETE FROM "Notifications" WHERE requestId=?`).run(requestId);
+  res.json({ success: true });
+});
+
 // ---------- Notifications (admin only) ----------
 app.post('/api/getNotifications', requireAdmin, (req, res) => {
-  const rows = db.prepare(`SELECT * FROM "Notifications" ORDER BY created_at DESC LIMIT 50`).all();
+  const rows = db.prepare(`
+    SELECT n.*, sur.previousStock, sur.requestedStock, sur.status AS requestStatus, p.name AS productName
+    FROM "Notifications" n
+    LEFT JOIN "StockUpdateRequests" sur ON sur.id = n.requestId
+    LEFT JOIN "Products" p ON p.id = n.productId
+    ORDER BY n.created_at DESC LIMIT 50
+  `).all();
   const unreadCount = db.prepare(`SELECT COUNT(*) AS c FROM "Notifications" WHERE isRead = 0`).get().c;
   res.json({ notifications: rows, unreadCount });
 });
@@ -160,6 +202,12 @@ app.post('/api/supplier/summary', requireSupplier, (req, res) => {
     LIMIT 200
   `).all(supplierId);
 
+  const pendingRequests = db.prepare(`
+    SELECT productId, requestedStock, previousStock FROM "StockUpdateRequests"
+    WHERE supplierId = ? AND status = 'pending'
+  `).all(supplierId);
+  const pendingByProduct = Object.fromEntries(pendingRequests.map(r => [r.productId, r]));
+
   const totalProfit = salesRows.reduce((sum, s) => sum + (s.profit || 0), 0);
   const totalShare = totalProfit / 3;
 
@@ -177,6 +225,9 @@ app.post('/api/supplier/summary', requireSupplier, (req, res) => {
       status: p.status || 'Active',
       stockFlag: (p.currentStock ?? 0) <= 0 ? 'Out of Stock'
         : (p.currentStock ?? 0) <= (p.lowStockThreshold ?? 10) ? 'Low Stock' : 'OK',
+      pendingStockRequest: pendingByProduct[p.id]
+        ? { previousStock: pendingByProduct[p.id].previousStock, requestedStock: pendingByProduct[p.id].requestedStock }
+        : null,
     })),
     recentSales: salesRows.slice(0, 30).map(s => ({
       id: s.id, date: s.date, productName: s.productName, quantity: s.quantity,
@@ -194,17 +245,49 @@ app.post('/api/supplier/saveProduct', requireSupplier, (req, res) => {
   if (b.id) {
     const owner = productSupplierId(b.id);
     if (owner !== supplierId) return res.status(403).json({ error: 'Not your product' });
+
+    const existing = db.prepare(`SELECT currentStock, lowStockThreshold, name FROM "Products" WHERE id=?`).get(b.id);
+    const oldStock = existing?.currentStock ?? 0;
+    const threshold = existing?.lowStockThreshold ?? 10;
+    const wasLowOrOut = oldStock <= threshold; // covers both Low Stock and Out of Stock
+    const newStockRequested = b.currentStock !== undefined && b.currentStock !== null ? Number(b.currentStock) : oldStock;
+    const stockChanged = newStockRequested !== oldStock;
+    const needsConfirmation = wasLowOrOut && stockChanged;
+
+    // Everything except the stock quantity updates immediately. A restock on
+    // a product that was low/out of stock is held for the admin to confirm
+    // before it takes effect (keeps the supplier's stock update honest).
     db.prepare(`
       UPDATE "Products" SET name=?, sku=?, category=?, brand=?, unit=?, description=?,
-        costPrice=?, currentStock=?, lowStockThreshold=?
+        costPrice=?, lowStockThreshold=?
+        ${needsConfirmation ? '' : ', currentStock=?'}
       WHERE id=?
     `).run(
-      b.name, b.sku ?? null, b.category ?? null, b.brand ?? null, b.unit ?? 'Piece', b.description ?? null,
-      b.costPrice ?? null, b.currentStock ?? 0, b.lowStockThreshold ?? 10, b.id
+      ...(needsConfirmation
+        ? [b.name, b.sku ?? null, b.category ?? null, b.brand ?? null, b.unit ?? 'Piece', b.description ?? null, b.costPrice ?? null, b.lowStockThreshold ?? 10, b.id]
+        : [b.name, b.sku ?? null, b.category ?? null, b.brand ?? null, b.unit ?? 'Piece', b.description ?? null, b.costPrice ?? null, b.lowStockThreshold ?? 10, newStockRequested, b.id])
     );
-    db.prepare(`UPDATE "Products" SET status=? WHERE id=?`)
-      .run((b.currentStock ?? 0) <= 0 ? 'Out of Stock' : 'Active', b.id);
-    return res.json({ success: true, id: b.id });
+
+    if (!needsConfirmation) {
+      db.prepare(`UPDATE "Products" SET status=? WHERE id=?`)
+        .run(newStockRequested <= 0 ? 'Out of Stock' : 'Active', b.id);
+      return res.json({ success: true, id: b.id, pendingStockUpdate: false });
+    }
+
+    const reqId = uuid();
+    db.prepare(`
+      INSERT INTO "StockUpdateRequests" (id, productId, supplierId, previousStock, requestedStock, status)
+      VALUES (?,?,?,?,?,'pending')
+    `).run(reqId, b.id, supplierId, oldStock, newStockRequested);
+
+    const supplier = db.prepare(`SELECT name FROM "Suppliers" WHERE id = ?`).get(supplierId);
+    db.prepare(`INSERT INTO "Notifications" (id, type, message, productId, requestId) VALUES (?,?,?,?,?)`).run(
+      uuid(), 'stock_request',
+      `${supplier?.name || 'A supplier'} wants to update stock for "${existing?.name || b.name}" from ${oldStock} to ${newStockRequested} — needs confirmation.`,
+      b.id, reqId
+    );
+
+    return res.json({ success: true, id: b.id, pendingStockUpdate: true });
   }
 
   const id = uuid();
@@ -671,10 +754,10 @@ app.post('/api/getDashboard', requireAdmin, (req, res) => {
 
   const ps = db.prepare(`
     SELECT
-      COUNT(*) FILTER (WHERE status='Active') AS totalProducts,
-      COALESCE(SUM(currentStock * COALESCE(costPrice, unitPrice, 0)) FILTER (WHERE status='Active'), 0) AS totalStockValue,
-      COUNT(*) FILTER (WHERE currentStock <= lowStockThreshold AND currentStock > 0 AND status='Active') AS lowStockCount,
-      COUNT(*) FILTER (WHERE (currentStock IS NULL OR currentStock <= 0) AND status='Active') AS outOfStockCount
+      COUNT(*) AS totalProducts,
+      COALESCE(SUM(currentStock * COALESCE(costPrice, unitPrice, 0)), 0) AS totalStockValue,
+      COUNT(*) FILTER (WHERE currentStock > 0 AND currentStock <= lowStockThreshold) AS lowStockCount,
+      COUNT(*) FILTER (WHERE currentStock IS NULL OR currentStock <= 0) AS outOfStockCount
     FROM "Products"
   `).get();
 
@@ -699,10 +782,10 @@ app.post('/api/getDashboard', requireAdmin, (req, res) => {
     ORDER BY s.date DESC, s.created_at DESC LIMIT 5
   `).all();
 
-  const lowStockProducts = db.prepare(`
+  const stockAlertRows = db.prepare(`
     SELECT id, name, currentStock, lowStockThreshold, category FROM "Products"
-    WHERE currentStock <= lowStockThreshold AND status='Active'
-    ORDER BY currentStock ASC LIMIT 10
+    WHERE currentStock IS NULL OR currentStock <= lowStockThreshold
+    ORDER BY currentStock ASC LIMIT 30
   `).all();
 
   const salesOverTime = db.prepare(`
@@ -746,9 +829,14 @@ app.post('/api/getDashboard', requireAdmin, (req, res) => {
       id: r.id, saleId: r.saleId, date: r.date, productName: r.productName,
       revenue: r.revenue ?? 0, profit: r.profit ?? 0, quantity: r.quantity ?? 0,
     })),
-    lowStockProducts: lowStockProducts.map(r => ({
+    lowStockProducts: stockAlertRows.map(r => ({
       id: r.id, name: r.name, currentStock: r.currentStock ?? 0,
       lowStockThreshold: r.lowStockThreshold ?? 20, category: r.category || null,
+    })),
+    stockAlerts: stockAlertRows.map(r => ({
+      id: r.id, name: r.name, currentStock: r.currentStock ?? 0,
+      lowStockThreshold: r.lowStockThreshold ?? 20, category: r.category || null,
+      stockFlag: (r.currentStock ?? 0) <= 0 ? 'Out of Stock' : 'Low Stock',
     })),
     salesOverTime: salesOverTime.map(r => ({ date: r.date, revenue: r.revenue, profit: r.profit })),
     expensesByCategory: expensesByCategory.map(r => ({ category: r.category, amount: r.amount })),

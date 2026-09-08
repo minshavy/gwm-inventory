@@ -71,6 +71,8 @@ export const addSupplierCategory = (input: any) => call('supplier/addCategory', 
 // ---- Notifications (admin) ----
 export const getNotifications = (input: any = {}) => call('getNotifications', input);
 export const markNotificationsRead = (input: any) => call('markNotificationsRead', input);
+export const confirmStockUpdate = (input: any) => call('admin/confirmStockUpdate', input);
+export const rejectStockUpdate = (input: any) => call('admin/rejectStockUpdate', input);
 
 export const api = {
   getProducts, saveProduct, deleteProduct,
@@ -82,7 +84,7 @@ export const api = {
   getDashboard, getProfitLoss, exportPdf,
   changePassword, getUsers, createSupplierLogin, resetPassword, setUserStatus,
   getSupplierSummary, saveSupplierProduct, deleteSupplierProduct, addSupplierCategory,
-  getNotifications, markNotificationsRead,
+  getNotifications, markNotificationsRead, confirmStockUpdate, rejectStockUpdate,
 };
 
 // Permissive type aliases so `import { GetProductsOutputType } from '@/lib/api-client'`
