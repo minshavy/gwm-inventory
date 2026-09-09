@@ -16,10 +16,12 @@ const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const CategoriesPage = lazy(() => import('./pages/CategoriesPage'));
 const ExpenseCategoriesPage = lazy(() => import('./pages/ExpenseCategoriesPage'));
 const PaymentMethodsPage = lazy(() => import('./pages/PaymentMethodsPage'));
+const HelpPage = lazy(() => import('./pages/HelpPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const SupplierProductsPage = lazy(() => import('./pages/SupplierProductsPage'));
 const SupplierStockPage = lazy(() => import('./pages/SupplierStockPage'));
 const SupplierEarningsPage = lazy(() => import('./pages/SupplierEarningsPage'));
+const SupplierHelpPage = lazy(() => import('./pages/SupplierHelpPage'));
 
 function PageLoader() {
   return (
@@ -58,6 +60,7 @@ function AppRoutes() {
           <Route path="/" element={<Suspense fallback={<PageLoader />}><SupplierProductsPage /></Suspense>} />
           <Route path="/stock" element={<Suspense fallback={<PageLoader />}><SupplierStockPage /></Suspense>} />
           <Route path="/earnings" element={<Suspense fallback={<PageLoader />}><SupplierEarningsPage /></Suspense>} />
+          <Route path="/help" element={<Suspense fallback={<PageLoader />}><SupplierHelpPage /></Suspense>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
@@ -79,6 +82,7 @@ function AppRoutes() {
         <Route path="/categories" element={<Suspense fallback={<PageLoader />}><CategoriesPage /></Suspense>} />
         <Route path="/expense-categories" element={<Suspense fallback={<PageLoader />}><ExpenseCategoriesPage /></Suspense>} />
         <Route path="/payment-methods" element={<Suspense fallback={<PageLoader />}><PaymentMethodsPage /></Suspense>} />
+        <Route path="/help" element={<Suspense fallback={<PageLoader />}><HelpPage /></Suspense>} />
         <Route path="/movements" element={<Navigate to="/stock" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

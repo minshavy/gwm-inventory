@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-shim';
 import { getSupplierSummary } from '@/lib/api-client';
+import { BackToTopButton } from '@/components/BackToTopButton';
 import { Button } from '@project/components/ui/button';
-import { Package, AlertTriangle, Wallet, LogOut } from 'lucide-react';
+import { Package, AlertTriangle, Wallet, LogOut, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const tabs = [
   { to: '/', label: 'Products', icon: Package, end: true },
   { to: '/stock', label: 'Stock Alerts', icon: AlertTriangle, end: false },
   { to: '/earnings', label: 'My Earnings', icon: Wallet, end: false },
+  { to: '/help', label: 'Help', icon: HelpCircle, end: false },
 ];
 
 export default function SupplierLayout() {
@@ -82,6 +84,8 @@ export default function SupplierLayout() {
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-6">
         <Outlet />
       </main>
+
+      <BackToTopButton />
 
       <div className="sm:hidden border-t bg-card p-2 flex items-center justify-between">
         <span className="text-xs text-muted-foreground truncate px-1">{user?.username}</span>

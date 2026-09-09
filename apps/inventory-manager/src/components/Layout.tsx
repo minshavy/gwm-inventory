@@ -3,13 +3,14 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, ArrowLeftRight, ShoppingCart,
   Receipt, TrendingUp, BarChart3, Tags, Tag, Truck, CreditCard,
-  Menu, X, ChevronLeft, LogOut,
+  Menu, X, ChevronLeft, LogOut, HelpCircle,
 } from 'lucide-react';
 import { cn } from '@project/components/lib/utils';
 import { Button } from '@project/components/ui/button';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth-shim';
 import { getNotifications } from '@/lib/api-client';
+import { BackToTopButton } from '@/components/BackToTopButton';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -23,6 +24,7 @@ const navItems = [
   { to: '/expense-categories', label: 'Expense Categories', icon: Tag },
   { to: '/suppliers', label: 'Suppliers', icon: Truck },
   { to: '/payment-methods', label: 'Payment Methods', icon: CreditCard },
+  { to: '/help', label: 'Help & Guide', icon: HelpCircle },
 ];
 
 function SidebarContent({ onNavigate, unreadCount = 0 }: { onNavigate?: () => void; unreadCount?: number }) {
@@ -264,6 +266,8 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+
+      <BackToTopButton />
     </div>
   );
 }

@@ -6,7 +6,6 @@ import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@project/components/ui/tabs';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { BackToTopButton } from '@/components/BackToTopButton';
 import { Download, BarChart3, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -289,7 +288,6 @@ export default function ReportsPage() {
         )}
       </Tabs>
 
-      <BackToTopButton />
     </div>
   );
 }
