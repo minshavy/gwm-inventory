@@ -267,7 +267,10 @@ export default function SalesPage() {
                       />
                     </div>
                   </div>
-                  <div className="max-h-60 overflow-y-auto p-1">
+                  <div
+                    className="max-h-60 overflow-y-auto p-1"
+                    onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}
+                  >
                     {filteredProducts.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">No products found</p>
                     ) : (

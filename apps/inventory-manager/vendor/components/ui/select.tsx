@@ -85,10 +85,11 @@ const SelectContent = React.forwardRef<
     >
       <SelectScrollUpButton />
       <SelectPrimitive.Viewport
+        onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}
         className={cn(
           'p-1',
           position === 'popper' &&
-            'h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]',
+            'w-full min-w-[var(--radix-select-trigger-width)] max-h-[var(--radix-select-content-available-height)]',
         )}
       >
         {children}

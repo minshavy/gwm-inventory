@@ -32,7 +32,7 @@ function SidebarContent({ onNavigate, unreadCount = 0 }: { onNavigate?: () => vo
         <Package className="w-5 h-5 text-primary flex-shrink-0" />
         <span className="text-base font-semibold tracking-tight">GWM Inventory</span>
       </div>
-      <nav className="flex-1 overflow-y-auto py-2 px-2">
+      <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}>
         {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
@@ -95,7 +95,7 @@ export default function Layout() {
             <div className="flex items-center justify-center h-14 border-b">
               <Package className="w-5 h-5 text-primary" />
             </div>
-            <nav className="flex-1 overflow-y-auto py-2 px-2">
+            <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}>
               {navItems.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
@@ -183,7 +183,7 @@ export default function Layout() {
                   <X className="w-5 h-5" />
                 </Button>
               </div>
-              <nav className="flex-1 overflow-y-auto py-2 px-2">
+              <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}>
                 {navItems.map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}

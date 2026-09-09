@@ -95,7 +95,7 @@ export default function ProductsPage() {
       toast.success(`${deleteTarget.name} deleted`);
       setDeleteTarget(null);
       fetchProducts(search, category, page);
-    } catch { toast.error('Failed to delete'); }
+    } catch (e: any) { toast.error(e?.message || 'Failed to delete'); }
     finally { setDeleting(false); }
   };
 
@@ -239,7 +239,7 @@ export default function ProductsPage() {
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         title={`Delete "${deleteTarget?.name}"?`}
-        description="This action cannot be undone. The product and its data will be permanently removed."
+        description="This action cannot be undone. Products that already have recorded sales can't be deleted."
         onConfirm={handleDelete}
         loading={deleting}
       />

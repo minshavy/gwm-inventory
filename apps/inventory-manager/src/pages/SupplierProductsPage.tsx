@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getSupplierSummary, saveSupplierProduct, deleteSupplierProduct, getLookups, addSupplierCategory } from '@/lib/api-client';
+import { getSupplierSummary, saveSupplierProduct, getLookups, addSupplierCategory } from '@/lib/api-client';
 import { Button } from '@project/components/ui/button';
 import { Input } from '@project/components/ui/input';
 import { Label } from '@project/components/ui/label';
@@ -9,8 +9,7 @@ import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@project/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@project/components/ui/select';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@project/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, Loader2, PlusCircle, Clock } from 'lucide-react';
+import { Plus, Pencil, Loader2, PlusCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 const emptyForm = { name: '', sku: '', category: '', brand: '', unit: 'Piece', description: '', costPrice: '', currentStock: '', lowStockThreshold: '10' };
@@ -35,7 +34,6 @@ export default function SupplierProductsPage() {
   const [editId, setEditId] = useState<string | undefined>();
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
   const skuManuallyEdited = useRef(false);
   const [showNewCat, setShowNewCat] = useState(false);
   const [newCatName, setNewCatName] = useState('');
@@ -139,18 +137,6 @@ export default function SupplierProductsPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
-    try {
-      await deleteSupplierProduct({ id: deleteId });
-      toast.success('Product deleted');
-      setDeleteId(null);
-      load();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to delete');
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -183,7 +169,6 @@ export default function SupplierProductsPage() {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {stockBadge(p.stockFlag)}
                     <Button variant="ghost" size="icon" onClick={() => openDialog(p)}><Pencil className="w-4 h-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => setDeleteId(p.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                   </div>
                 </div>
               ))}
@@ -274,19 +259,6 @@ export default function SupplierProductsPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this product?</AlertDialogTitle>
-            <AlertDialogDescription>This can't be undone. Products that already have sales recorded can't be deleted — ask the admin to discontinue them instead.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

@@ -65,7 +65,6 @@ export const setUserStatus = (input: any) => call('admin/setUserStatus', input);
 // ---- Supplier portal ----
 export const getSupplierSummary = (input: any = {}) => call('supplier/summary', input);
 export const saveSupplierProduct = (input: any) => call('supplier/saveProduct', input);
-export const deleteSupplierProduct = (input: any) => call('supplier/deleteProduct', input);
 export const addSupplierCategory = (input: any) => call('supplier/addCategory', input);
 
 // ---- Notifications (admin) ----
@@ -83,7 +82,7 @@ export const api = {
   getLookups, saveLookup, deleteLookup,
   getDashboard, getProfitLoss, exportPdf,
   changePassword, getUsers, createSupplierLogin, resetPassword, setUserStatus,
-  getSupplierSummary, saveSupplierProduct, deleteSupplierProduct, addSupplierCategory,
+  getSupplierSummary, saveSupplierProduct, addSupplierCategory,
   getNotifications, markNotificationsRead, confirmStockUpdate, rejectStockUpdate,
 };
 

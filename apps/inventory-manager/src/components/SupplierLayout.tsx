@@ -1,7 +1,10 @@
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/auth-shim';
+import { getSupplierSummary } from '@/lib/api-client';
 import { Button } from '@project/components/ui/button';
 import { Package, AlertTriangle, Wallet, LogOut } from 'lucide-react';
+import { toast } from 'sonner';
 
 const tabs = [
   { to: '/', label: 'Products', icon: Package, end: true },
@@ -13,6 +16,28 @@ export default function SupplierLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const pageTitle = tabs.find(t => (t.end ? location.pathname === t.to : location.pathname.startsWith(t.to)))?.label ?? 'Products';
+
+  const [alertCount, setAlertCount] = useState(0);
+  const prevCount = useRef<number | null>(null);
+
+  useEffect(() => {
+    const poll = () => {
+      getSupplierSummary({}).then(res => {
+        const count = (res.products || []).filter((p: any) => p.stockFlag !== 'OK').length;
+        setAlertCount(count);
+        if (count > 0 && (prevCount.current === null || count > prevCount.current)) {
+          toast.warning(
+            count === 1 ? 'One of your products is low or out of stock.' : `${count} of your products are low or out of stock.`,
+            { description: 'Check the Stock Alerts tab.' }
+          );
+        }
+        prevCount.current = count;
+      }).catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, 20000);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -44,6 +69,11 @@ export default function SupplierLayout() {
             >
               <Icon className="w-4 h-4 flex-shrink-0" />
               <span className="truncate">{label}</span>
+              {to === '/stock' && alertCount > 0 && (
+                <span className="text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                  {alertCount > 9 ? '9+' : alertCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

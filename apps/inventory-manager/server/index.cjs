@@ -334,16 +334,10 @@ app.post('/api/supplier/addCategory', requireSupplier, (req, res) => {
   res.json({ success: true, id });
 });
 
+// Suppliers can no longer delete their own products — only edit them.
+// If a product genuinely needs to go, the admin discontinues/removes it.
 app.post('/api/supplier/deleteProduct', requireSupplier, (req, res) => {
-  const { id } = req.body || {};
-  const owner = productSupplierId(id);
-  if (owner !== req.user.supplierId) return res.status(403).json({ error: 'Not your product' });
-  const hasSales = db.prepare(`SELECT COUNT(*) AS c FROM "ProductsSales" WHERE productsId = ?`).get(id).c;
-  if (hasSales > 0) return res.status(400).json({ error: "Can't delete a product that already has recorded sales — ask the admin to discontinue it instead." });
-  db.prepare(`DELETE FROM "ProductsSuppliers" WHERE productsId = ?`).run(id);
-  db.prepare(`DELETE FROM "ProductsStockMovements" WHERE productsId = ?`).run(id);
-  db.prepare(`DELETE FROM "Products" WHERE id = ?`).run(id);
-  res.json({ success: true });
+  res.status(403).json({ error: "Suppliers can't delete products — ask the admin to remove it for you." });
 });
 
 // ---------- Products (admin only — suppliers use /api/supplier/*) ----------
