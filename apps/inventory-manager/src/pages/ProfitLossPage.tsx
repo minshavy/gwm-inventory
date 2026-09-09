@@ -6,6 +6,7 @@ import { Skeleton } from '@project/components/ui/skeleton';
 import { TrendingUp, TrendingDown, DollarSign, ArrowDown, Minus, FileText, Loader2 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
+import { BackToTopButton } from '@/components/BackToTopButton';
 
 const fmt = (n: number) => `MVR ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
@@ -213,6 +214,8 @@ export default function ProfitLossPage() {
           <p className="text-base sm:text-lg font-bold">{data.revenue > 0 ? `${((data.netProfit / data.revenue) * 100).toFixed(1)}%` : '0%'}</p>
         </div>
       </div>
+
+      <BackToTopButton />
     </div>
   );
 }

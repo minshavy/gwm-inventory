@@ -9,6 +9,7 @@ import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@project/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@project/components/ui/popover';
+import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Plus, Search, Trash2, ShoppingCart, ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@project/components/lib/utils';
 import { toast } from 'sonner';
@@ -153,16 +154,7 @@ export default function SalesPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="w-full sm:w-auto">
-          <label className="text-xs font-medium text-muted-foreground mb-1 block">From:</label>
-          <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full sm:w-40" />
-        </div>
-        <div className="w-full sm:w-auto">
-          <label className="text-xs font-medium text-muted-foreground mb-1 block">To:</label>
-          <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full sm:w-40" />
-        </div>
-      </div>
+      <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} />
 
       {/* Table */}
       {loading ? (
@@ -270,6 +262,7 @@ export default function SalesPage() {
                   <div
                     className="max-h-60 overflow-y-auto p-1"
                     onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}
+                    style={{ touchAction: 'pan-y' }}
                   >
                     {filteredProducts.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">No products found</p>

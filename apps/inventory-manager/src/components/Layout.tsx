@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, ArrowLeftRight, ShoppingCart,
   Receipt, TrendingUp, BarChart3, Tags, Tag, Truck, CreditCard,
@@ -32,7 +32,7 @@ function SidebarContent({ onNavigate, unreadCount = 0 }: { onNavigate?: () => vo
         <Package className="w-5 h-5 text-primary flex-shrink-0" />
         <span className="text-base font-semibold tracking-tight">GWM Inventory</span>
       </div>
-      <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}>
+      <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }} style={{ touchAction: 'pan-y' }}>
         {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
@@ -67,6 +67,7 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout } = useAuth();
 
   useEffect(() => {
@@ -75,11 +76,6 @@ export default function Layout() {
     const id = setInterval(poll, 20000);
     return () => clearInterval(id);
   }, [location.pathname]);
-
-  const pageTitle = navItems.find(n => {
-    if (n.to === '/') return location.pathname === '/';
-    return location.pathname.startsWith(n.to);
-  })?.label ?? 'Dashboard';
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -95,7 +91,7 @@ export default function Layout() {
             <div className="flex items-center justify-center h-14 border-b">
               <Package className="w-5 h-5 text-primary" />
             </div>
-            <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}>
+            <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }} style={{ touchAction: 'pan-y' }}>
               {navItems.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
@@ -143,14 +139,17 @@ export default function Layout() {
       </aside>
 
       {/* Mobile header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b h-14 flex items-center px-4 gap-3">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-card border-b h-14 flex items-center justify-between px-4 gap-3">
+        <button
+          onClick={() => navigate('/')}
+          className="flex items-center gap-2 min-w-0"
+        >
+          <Package className="w-4 h-4 text-primary flex-shrink-0" />
+          <span className="font-semibold text-sm truncate">GWM Inventory</span>
+        </button>
         <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)}>
           <Menu className="w-5 h-5" />
         </Button>
-        <div className="flex items-center gap-2">
-          <Package className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-sm">{pageTitle}</span>
-        </div>
       </header>
 
       {/* Mobile slide-in */}
@@ -168,11 +167,11 @@ export default function Layout() {
             />
             <motion.aside
               key="sidebar"
-              initial={{ x: '-100%' }}
+              initial={{ x: '100%' }}
               animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
+              exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="lg:hidden fixed top-0 left-0 bottom-0 z-50 w-64 bg-card/95 backdrop-blur-md border-r"
+              className="lg:hidden fixed top-0 right-0 bottom-0 z-50 w-64 bg-card/95 backdrop-blur-md border-l"
             >
               <div className="flex items-center justify-between px-4 h-14 border-b">
                 <div className="flex items-center gap-2">
@@ -183,7 +182,7 @@ export default function Layout() {
                   <X className="w-5 h-5" />
                 </Button>
               </div>
-              <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}>
+              <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }} style={{ touchAction: 'pan-y' }}>
                 {navItems.map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}

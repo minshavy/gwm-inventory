@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@project/components/ui/dialog';
 import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
+import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@project/components/ui/alert-dialog';
 import { Plus, Search, Trash2, Pencil, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
@@ -124,19 +125,12 @@ export default function ExpensesPage() {
         <Button onClick={() => openDialog()}><Plus className="w-4 h-4 mr-2" />Add Expense</Button>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input className="pl-9" placeholder="Search expenses..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <div className="w-full sm:w-auto">
-          <label className="text-xs font-medium text-muted-foreground mb-1 block">From:</label>
-          <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full sm:w-40" />
-        </div>
-        <div className="w-full sm:w-auto">
-          <label className="text-xs font-medium text-muted-foreground mb-1 block">To:</label>
-          <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full sm:w-40" />
-        </div>
+        <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} />
       </div>
 
       {loading ? (

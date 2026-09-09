@@ -125,4 +125,11 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
   }
+  /* Force native date-input chrome (text, calendar icon) to render in light
+     colors always. Without this, a phone set to system dark mode renders
+     the native picker's text/icon in light-on-light (invisible) even though
+     our own light theme is showing — looks like an empty field. */
+  input[type='date'] {
+    color-scheme: light;
+  }
 }

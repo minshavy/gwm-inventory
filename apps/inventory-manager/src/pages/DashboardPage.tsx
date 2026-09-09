@@ -4,6 +4,7 @@ import { getDashboard, getNotifications, markNotificationsRead, confirmStockUpda
 import { Skeleton } from '@project/components/ui/skeleton';
 import { Button } from '@project/components/ui/button';
 import { Badge } from '@project/components/ui/badge';
+import { BackToTopButton } from '@/components/BackToTopButton';
 import {
   Package, DollarSign, TrendingUp, TrendingDown, AlertTriangle,
   XCircle, ShoppingCart, ArrowDown, Bell, ArrowRight, Check, X, Loader2,
@@ -301,6 +302,8 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      <BackToTopButton />
     </div>
   );
 }

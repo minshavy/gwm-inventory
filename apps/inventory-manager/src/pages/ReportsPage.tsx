@@ -5,6 +5,8 @@ import { Input } from '@project/components/ui/input';
 import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@project/components/ui/tabs';
+import { DateRangeFilter } from '@/components/DateRangeFilter';
+import { BackToTopButton } from '@/components/BackToTopButton';
 import { Download, BarChart3, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -104,30 +106,23 @@ export default function ReportsPage() {
           <TabsTrigger value="stock">Stock</TabsTrigger>
         </TabsList>
 
-        <div className="flex flex-wrap gap-3 mt-4 mb-4">
-          {tab !== 'stock' && (
-            <>
-              <div className="w-full sm:w-auto">
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">From:</label>
-                <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full sm:w-40" />
-              </div>
-              <div className="w-full sm:w-auto">
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">To:</label>
-                <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full sm:w-40" />
-              </div>
-            </>
-          )}
-          <Button variant="outline" size="sm" onClick={() => {
-            if (tab === 'sales') exportSales();
-            else if (tab === 'expenses') exportExpenses();
-            else exportStock();
-          }}>
-            <Download className="w-4 h-4 mr-2" />Export CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={exporting}>
-            {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
-            Export PDF
-          </Button>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mt-4 mb-4">
+          {tab !== 'stock' ? (
+            <DateRangeFilter dateFrom={dateFrom} dateTo={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} />
+          ) : <div />}
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => {
+              if (tab === 'sales') exportSales();
+              else if (tab === 'expenses') exportExpenses();
+              else exportStock();
+            }}>
+              <Download className="w-4 h-4 mr-2" />Export CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPdf} disabled={exporting}>
+              {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
+              Export PDF
+            </Button>
+          </div>
         </div>
 
         {loading ? (
@@ -293,6 +288,8 @@ export default function ReportsPage() {
           </>
         )}
       </Tabs>
+
+      <BackToTopButton />
     </div>
   );
 }
