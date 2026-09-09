@@ -35,6 +35,40 @@ function productSupplierId(productId) {
   return row ? row.suppliersId : null;
 }
 
+// Total profit (unbounded — no LIMIT) from sales of a supplier's own
+// products, and their 1/3 share of it. Used by both the supplier's own
+// earnings view and the admin payout ledger, so the two always agree.
+function getSupplierEarnings(supplierId) {
+  const totalProfit = db.prepare(`
+    SELECT COALESCE(SUM(s.profit), 0) AS total
+    FROM "Sales" s
+    JOIN "ProductsSales" pl ON pl.salesId = s.id
+    JOIN "Products" p ON p.id = pl.productsId
+    JOIN "ProductsSuppliers" ps ON ps.productsId = p.id
+    WHERE ps.suppliersId = ?
+  `).get(supplierId).total;
+
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const thisMonthProfit = db.prepare(`
+    SELECT COALESCE(SUM(s.profit), 0) AS total
+    FROM "Sales" s
+    JOIN "ProductsSales" pl ON pl.salesId = s.id
+    JOIN "Products" p ON p.id = pl.productsId
+    JOIN "ProductsSuppliers" ps ON ps.productsId = p.id
+    WHERE ps.suppliersId = ? AND substr(s.date, 1, 7) = ?
+  `).get(supplierId, monthKey).total;
+
+  const totalPaid = db.prepare(`
+    SELECT COALESCE(SUM(amount), 0) AS total FROM "SupplierPayouts" WHERE supplierId = ?
+  `).get(supplierId).total;
+
+  const totalShare = totalProfit / 3;
+  return {
+    totalProfit, totalShare, thisMonthShare: thisMonthProfit / 3,
+    totalPaid, balance: totalShare - totalPaid,
+  };
+}
+
 // ---------- Auth ----------
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body || {};
@@ -128,6 +162,41 @@ app.post('/api/markNotificationsRead', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
+// ---------- Admin: supplier payout ledger ----------
+app.post('/api/admin/getSupplierBalances', requireAdmin, (req, res) => {
+  const suppliers = db.prepare(`SELECT id, name FROM "Suppliers" ORDER BY name ASC`).all();
+  const balances = suppliers.map(s => ({ supplierId: s.id, supplierName: s.name, ...getSupplierEarnings(s.id) }));
+  res.json({ balances });
+});
+
+app.post('/api/admin/getSupplierPayouts', requireAdmin, (req, res) => {
+  const { supplierId } = req.body || {};
+  const supplier = db.prepare(`SELECT id, name FROM "Suppliers" WHERE id = ?`).get(supplierId);
+  if (!supplier) return res.status(400).json({ error: 'Supplier not found' });
+  const payouts = db.prepare(`
+    SELECT * FROM "SupplierPayouts" WHERE supplierId = ? ORDER BY date DESC, created_at DESC
+  `).all(supplierId);
+  res.json({ supplier, payouts, ...getSupplierEarnings(supplierId) });
+});
+
+app.post('/api/admin/recordPayout', requireAdmin, (req, res) => {
+  const { supplierId, amount, date, notes } = req.body || {};
+  const supplier = db.prepare(`SELECT id FROM "Suppliers" WHERE id = ?`).get(supplierId);
+  if (!supplier) return res.status(400).json({ error: 'Supplier not found' });
+  if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'Enter an amount greater than 0' });
+  const id = uuid();
+  db.prepare(`
+    INSERT INTO "SupplierPayouts" (id, supplierId, amount, date, notes, recordedBy) VALUES (?,?,?,?,?,?)
+  `).run(id, supplierId, Number(amount), date || new Date().toISOString().slice(0, 10), notes ?? null, req.user.username);
+  res.json({ success: true, id });
+});
+
+app.post('/api/admin/deletePayout', requireAdmin, (req, res) => {
+  const { id } = req.body || {};
+  db.prepare(`DELETE FROM "SupplierPayouts" WHERE id = ?`).run(id);
+  res.json({ success: true });
+});
+
 // ---------- Admin: manage supplier logins ----------
 app.post('/api/admin/getUsers', requireAdmin, (req, res) => {
   const rows = db.prepare(`
@@ -208,13 +277,7 @@ app.post('/api/supplier/summary', requireSupplier, (req, res) => {
   `).all(supplierId);
   const pendingByProduct = Object.fromEntries(pendingRequests.map(r => [r.productId, r]));
 
-  const totalProfit = salesRows.reduce((sum, s) => sum + (s.profit || 0), 0);
-  const totalShare = totalProfit / 3;
-
-  const monthKey = new Date().toISOString().slice(0, 7);
-  const thisMonthProfit = salesRows
-    .filter(s => (s.date || '').slice(0, 7) === monthKey)
-    .reduce((sum, s) => sum + (s.profit || 0), 0);
+  const earnings = getSupplierEarnings(supplierId);
 
   res.json({
     products: products.map(p => ({
@@ -233,7 +296,8 @@ app.post('/api/supplier/summary', requireSupplier, (req, res) => {
       id: s.id, date: s.date, productName: s.productName, quantity: s.quantity,
       profit: s.profit ?? 0, share: (s.profit ?? 0) / 3,
     })),
-    totalProfit, totalShare, thisMonthShare: thisMonthProfit / 3,
+    totalProfit: earnings.totalProfit, totalShare: earnings.totalShare, thisMonthShare: earnings.thisMonthShare,
+    totalPaid: earnings.totalPaid, balance: earnings.balance,
   });
 });
 

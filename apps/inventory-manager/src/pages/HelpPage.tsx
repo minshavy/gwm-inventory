@@ -122,6 +122,11 @@ const supplierTerms: Term[] = [
     term: 'Stock Alerts (supplier view)',
     explanation: 'Suppliers have their own Stock Alerts tab showing only their own low/out-of-stock products, so they know what to restock.',
   },
+  {
+    term: 'Balance Owed & Payouts',
+    formula: 'Balance = Total Share − Total Paid',
+    explanation: 'The Payouts page shows what each supplier has earned vs what you\'ve actually paid them. Use "Mark as Paid" whenever you pay a supplier — it logs the amount and date, and the balance owed updates automatically.',
+  },
 ];
 
 export default function HelpPage() {

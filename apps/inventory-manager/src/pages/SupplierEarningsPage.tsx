@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSupplierSummary } from '@/lib/api-client';
 import { Skeleton } from '@project/components/ui/skeleton';
-import { Wallet, TrendingUp } from 'lucide-react';
+import { Wallet, TrendingUp, HandCoins, Scale } from 'lucide-react';
 
 const fmt = (n: number) => `MVR ${(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -51,6 +51,20 @@ export default function SupplierEarningsPage() {
           <div>
             <p className="text-xs text-muted-foreground">Share this month</p>
             <p className="text-base font-bold">{fmt(data.thisMonthShare)}</p>
+          </div>
+        </div>
+        <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-slate-500/10 text-slate-600 flex items-center justify-center"><HandCoins className="w-4 h-4" /></div>
+          <div>
+            <p className="text-xs text-muted-foreground">Paid to you so far</p>
+            <p className="text-base font-bold">{fmt(data.totalPaid)}</p>
+          </div>
+        </div>
+        <div className="bg-card border rounded-lg p-4 flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${data.balance > 0 ? 'bg-amber-500/10 text-amber-600' : 'bg-muted text-muted-foreground'}`}><Scale className="w-4 h-4" /></div>
+          <div>
+            <p className="text-xs text-muted-foreground">Balance owed to you</p>
+            <p className="text-base font-bold">{fmt(data.balance)}</p>
           </div>
         </div>
       </div>

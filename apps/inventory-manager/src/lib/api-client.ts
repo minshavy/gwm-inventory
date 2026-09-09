@@ -73,6 +73,12 @@ export const markNotificationsRead = (input: any) => call('markNotificationsRead
 export const confirmStockUpdate = (input: any) => call('admin/confirmStockUpdate', input);
 export const rejectStockUpdate = (input: any) => call('admin/rejectStockUpdate', input);
 
+// ---- Supplier payouts (admin) ----
+export const getSupplierBalances = (input: any = {}) => call('admin/getSupplierBalances', input);
+export const getSupplierPayouts = (input: any) => call('admin/getSupplierPayouts', input);
+export const recordPayout = (input: any) => call('admin/recordPayout', input);
+export const deletePayout = (input: any) => call('admin/deletePayout', input);
+
 export const api = {
   getProducts, saveProduct, deleteProduct,
   getMovements, recordStockMovement,
@@ -84,6 +90,7 @@ export const api = {
   changePassword, getUsers, createSupplierLogin, resetPassword, setUserStatus,
   getSupplierSummary, saveSupplierProduct, addSupplierCategory,
   getNotifications, markNotificationsRead, confirmStockUpdate, rejectStockUpdate,
+  getSupplierBalances, getSupplierPayouts, recordPayout, deletePayout,
 };
 
 // Permissive type aliases so `import { GetProductsOutputType } from '@/lib/api-client'`

@@ -50,6 +50,11 @@ const terms: Term[] = [
     term: 'My Earnings page',
     explanation: 'Shows your total share all-time, your share so far this month, and a list of recent sales of your products with the share earned from each one.',
   },
+  {
+    term: 'Paid so far & Balance owed',
+    formula: 'Balance = Total Share − Paid so far',
+    explanation: "\"Paid so far\" is what the admin has actually paid you, logged whenever they mark a payout. \"Balance owed\" is what's left — it updates automatically as you earn more or get paid.",
+  },
 ];
 
 export default function SupplierHelpPage() {

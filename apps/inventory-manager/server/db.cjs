@@ -114,6 +114,16 @@ function init() {
       status TEXT DEFAULT 'pending', -- pending | confirmed | rejected
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS "SupplierPayouts" (
+      id TEXT PRIMARY KEY,
+      supplierId TEXT,
+      amount REAL,
+      date TEXT,
+      notes TEXT,
+      recordedBy TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   // Migration: notifications about a stock request carry the request id so

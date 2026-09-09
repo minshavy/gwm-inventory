@@ -11,6 +11,7 @@ const MovementsPage = lazy(() => import('./pages/MovementsPage'));
 const SalesPage = lazy(() => import('./pages/SalesPage'));
 const ExpensesPage = lazy(() => import('./pages/ExpensesPage'));
 const SuppliersPage = lazy(() => import('./pages/SuppliersPage'));
+const PayoutsPage = lazy(() => import('./pages/PayoutsPage'));
 const ProfitLossPage = lazy(() => import('./pages/ProfitLossPage'));
 const ReportsPage = lazy(() => import('./pages/ReportsPage'));
 const CategoriesPage = lazy(() => import('./pages/CategoriesPage'));
@@ -77,6 +78,7 @@ function AppRoutes() {
         <Route path="/sales" element={<Suspense fallback={<PageLoader />}><SalesPage /></Suspense>} />
         <Route path="/expenses" element={<Suspense fallback={<PageLoader />}><ExpensesPage /></Suspense>} />
         <Route path="/suppliers" element={<Suspense fallback={<PageLoader />}><SuppliersPage /></Suspense>} />
+        <Route path="/payouts" element={<Suspense fallback={<PageLoader />}><PayoutsPage /></Suspense>} />
         <Route path="/profit-loss" element={<Suspense fallback={<PageLoader />}><ProfitLossPage /></Suspense>} />
         <Route path="/reports" element={<Suspense fallback={<PageLoader />}><ReportsPage /></Suspense>} />
         <Route path="/categories" element={<Suspense fallback={<PageLoader />}><CategoriesPage /></Suspense>} />
