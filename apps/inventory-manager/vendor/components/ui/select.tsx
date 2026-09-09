@@ -86,6 +86,13 @@ const SelectContent = React.forwardRef<
       <SelectScrollUpButton />
       <SelectPrimitive.Viewport
         onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}
+        onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
+        onTouchMove={(e) => {
+          const el = e.currentTarget as any;
+          const y = e.touches[0].clientY;
+          el.scrollTop += el._touchY - y;
+          el._touchY = y;
+        }}
         style={{ touchAction: 'pan-y' }}
         className={cn(
           'p-1',

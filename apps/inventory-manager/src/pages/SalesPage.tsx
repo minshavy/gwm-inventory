@@ -262,6 +262,17 @@ export default function SalesPage() {
                   <div
                     className="max-h-60 overflow-y-auto p-1"
                     onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}
+                    onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
+                    onTouchMove={(e) => {
+                      // This list is rendered in a portal outside the dialog's own
+                      // DOM tree, so the dialog's scroll-lock blocks native touch
+                      // scrolling here even with touch-action set. Drag the
+                      // scroll position manually instead, bypassing that lock.
+                      const el = e.currentTarget as any;
+                      const y = e.touches[0].clientY;
+                      el.scrollTop += el._touchY - y;
+                      el._touchY = y;
+                    }}
                     style={{ touchAction: 'pan-y' }}
                   >
                     {filteredProducts.length === 0 ? (

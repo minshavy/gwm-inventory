@@ -26,13 +26,25 @@ const navItems = [
 ];
 
 function SidebarContent({ onNavigate, unreadCount = 0 }: { onNavigate?: () => void; unreadCount?: number }) {
+  const navigate = useNavigate();
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-4 h-14 border-b">
+      <button
+        onClick={() => { navigate('/'); onNavigate?.(); }}
+        className="flex items-center gap-2 px-4 h-14 border-b text-left hover:bg-muted/50 transition-colors"
+      >
         <Package className="w-5 h-5 text-primary flex-shrink-0" />
         <span className="text-base font-semibold tracking-tight">GWM Inventory</span>
-      </div>
-      <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }} style={{ touchAction: 'pan-y' }}>
+      </button>
+      <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}
+        onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
+        onTouchMove={(e) => {
+          const el = e.currentTarget as any;
+          const y = e.touches[0].clientY;
+          el.scrollTop += el._touchY - y;
+          el._touchY = y;
+        }}
+        style={{ touchAction: 'pan-y' }}>
         {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
@@ -88,10 +100,22 @@ export default function Layout() {
       >
         {collapsed ? (
           <div className="flex flex-col h-full">
-            <div className="flex items-center justify-center h-14 border-b">
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center justify-center h-14 border-b hover:bg-muted/50 transition-colors"
+              title="GWM Inventory"
+            >
               <Package className="w-5 h-5 text-primary" />
-            </div>
-            <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }} style={{ touchAction: 'pan-y' }}>
+            </button>
+            <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}
+        onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
+        onTouchMove={(e) => {
+          const el = e.currentTarget as any;
+          const y = e.touches[0].clientY;
+          el.scrollTop += el._touchY - y;
+          el._touchY = y;
+        }}
+        style={{ touchAction: 'pan-y' }}>
               {navItems.map(({ to, label, icon: Icon }) => (
                 <NavLink
                   key={to}
@@ -182,7 +206,15 @@ export default function Layout() {
                   <X className="w-5 h-5" />
                 </Button>
               </div>
-              <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }} style={{ touchAction: 'pan-y' }}>
+              <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}
+        onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
+        onTouchMove={(e) => {
+          const el = e.currentTarget as any;
+          const y = e.touches[0].clientY;
+          el.scrollTop += el._touchY - y;
+          el._touchY = y;
+        }}
+        style={{ touchAction: 'pan-y' }}>
                 {navItems.map(({ to, label, icon: Icon }) => (
                   <NavLink
                     key={to}

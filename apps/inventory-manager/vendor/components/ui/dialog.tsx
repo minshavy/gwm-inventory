@@ -32,7 +32,7 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, onWheel, style, ...props }, ref) => (
+>(({ className, children, onWheel, onTouchStart, onTouchMove, style, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -43,6 +43,18 @@ const DialogContent = React.forwardRef<
         // manually so mouse-wheel always works here, not just the scrollbar.
         e.currentTarget.scrollTop += e.deltaY;
         onWheel?.(e);
+      }}
+      onTouchStart={(e) => {
+        (e.currentTarget as any)._touchY = e.touches[0].clientY;
+        onTouchStart?.(e);
+      }}
+      onTouchMove={(e) => {
+        // Same lock also swallows touchmove on mobile — drag scroll manually.
+        const el = e.currentTarget as any;
+        const y = e.touches[0].clientY;
+        el.scrollTop += el._touchY - y;
+        el._touchY = y;
+        onTouchMove?.(e);
       }}
       style={{ touchAction: 'pan-y', ...style }}
       className={cn(
