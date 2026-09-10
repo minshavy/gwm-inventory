@@ -50,6 +50,7 @@ export const deleteSupplier = (input: any) => call('deleteSupplier', input);
 export const getLookups = (input: any) => call('getLookups', input);
 export const saveLookup = (input: any) => call('saveLookup', input);
 export const deleteLookup = (input: any) => call('deleteLookup', input);
+export const bulkImportProducts = (input: any) => call('bulkImportProducts', input);
 
 export const getDashboard = (input: any) => call('getDashboard', input);
 export const getProfitLoss = (input: any) => call('getProfitLoss', input);
@@ -66,6 +67,7 @@ export const setUserStatus = (input: any) => call('admin/setUserStatus', input);
 export const getSupplierSummary = (input: any = {}) => call('supplier/summary', input);
 export const saveSupplierProduct = (input: any) => call('supplier/saveProduct', input);
 export const addSupplierCategory = (input: any) => call('supplier/addCategory', input);
+export const bulkImportSupplierProducts = (input: any) => call('supplier/bulkImportProducts', input);
 
 // ---- Notifications (admin) ----
 export const getNotifications = (input: any = {}) => call('getNotifications', input);
@@ -85,10 +87,10 @@ export const api = {
   getSales, recordSale, deleteSale,
   getExpenses, saveExpense, deleteExpense,
   getSuppliers, saveSupplier, deleteSupplier,
-  getLookups, saveLookup, deleteLookup,
+  getLookups, saveLookup, deleteLookup, bulkImportProducts,
   getDashboard, getProfitLoss, exportPdf,
   changePassword, getUsers, createSupplierLogin, resetPassword, setUserStatus,
-  getSupplierSummary, saveSupplierProduct, addSupplierCategory,
+  getSupplierSummary, saveSupplierProduct, addSupplierCategory, bulkImportSupplierProducts,
   getNotifications, markNotificationsRead, confirmStockUpdate, rejectStockUpdate,
   getSupplierBalances, getSupplierPayouts, recordPayout, deletePayout,
 };

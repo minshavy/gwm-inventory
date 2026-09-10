@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getSupplierSummary, saveSupplierProduct, getLookups, addSupplierCategory } from '@/lib/api-client';
+import { getSupplierSummary, saveSupplierProduct, getLookups, addSupplierCategory, bulkImportSupplierProducts } from '@/lib/api-client';
 import { Button } from '@project/components/ui/button';
 import { Input } from '@project/components/ui/input';
 import { Label } from '@project/components/ui/label';
@@ -9,8 +9,9 @@ import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@project/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@project/components/ui/select';
-import { Plus, Pencil, Loader2, PlusCircle, Clock } from 'lucide-react';
+import { Plus, Pencil, Loader2, PlusCircle, Clock, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import { BulkImportDialog } from '@/components/BulkImportDialog';
 
 const emptyForm = { name: '', sku: '', category: '', brand: '', unit: 'Piece', description: '', costPrice: '', currentStock: '', lowStockThreshold: '10' };
 
@@ -36,6 +37,7 @@ export default function SupplierProductsPage() {
   const [saving, setSaving] = useState(false);
   const skuManuallyEdited = useRef(false);
   const [showNewCat, setShowNewCat] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [newCatName, setNewCatName] = useState('');
   const [addingCat, setAddingCat] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -139,12 +141,17 @@ export default function SupplierProductsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold">Your products</h1>
-          <p className="text-sm text-muted-foreground">Add, edit, or remove the products you supply.</p>
+          <p className="text-sm text-muted-foreground">Add or edit the products you supply.</p>
         </div>
-        <Button size="sm" onClick={() => openDialog()}><Plus className="w-4 h-4 mr-1" /> Add product</Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setShowBulkImport(true)}>
+            <Upload className="w-4 h-4 mr-1" /> Bulk Import
+          </Button>
+          <Button size="sm" onClick={() => openDialog()}><Plus className="w-4 h-4 mr-1" /> Add product</Button>
+        </div>
       </div>
 
       {loading ? (
@@ -259,6 +266,20 @@ export default function SupplierProductsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <BulkImportDialog
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        title="Bulk import your products"
+        headers={['name', 'sku', 'category', 'brand', 'unit', 'description', 'costPrice', 'currentStock', 'lowStockThreshold']}
+        sampleRow={{
+          name: 'Sample Perfume 50ml', sku: '', category: 'Perfumes', brand: 'Sample Brand', unit: 'Piece',
+          description: 'Optional description', costPrice: '150', currentStock: '20', lowStockThreshold: '5',
+        }}
+        templateFilename="my-products-template.csv"
+        onImport={rows => bulkImportSupplierProducts({ rows })}
+        onDone={load}
+      />
     </div>
   );
 }

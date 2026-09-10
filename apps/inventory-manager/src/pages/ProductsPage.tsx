@@ -1,17 +1,18 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getProducts, GetProductsOutputType, deleteProduct, getLookups } from '@/lib/api-client';
+import { getProducts, GetProductsOutputType, deleteProduct, getLookups, bulkImportProducts } from '@/lib/api-client';
 import { Button } from '@project/components/ui/button';
 import { Input } from '@project/components/ui/input';
 import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@project/components/ui/select';
-import { Plus, Search, Trash2, Package } from 'lucide-react';
+import { Plus, Search, Trash2, Package, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDebouncedCallback } from 'use-debounce';
 import ProductDialog from '../components/ProductDialog';
 import StockMovementDialog from '../components/StockMovementDialog';
 import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
+import { BulkImportDialog } from '@/components/BulkImportDialog';
 
 type Product = GetProductsOutputType['products'][0];
 
@@ -24,6 +25,7 @@ export default function ProductsPage() {
   const [page, setPage] = useState(0);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -108,9 +110,14 @@ export default function ProductsPage() {
           <h2 className="text-xl font-semibold">Products</h2>
           {!loading && <p className="text-sm text-muted-foreground mt-0.5">{total} product{total !== 1 ? 's' : ''} total</p>}
         </div>
-        <Button onClick={() => setShowAdd(true)}>
-          <Plus className="w-4 h-4 mr-1.5" /> Add Product
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowBulkImport(true)}>
+            <Upload className="w-4 h-4 mr-1.5" /> Bulk Import
+          </Button>
+          <Button onClick={() => setShowAdd(true)}>
+            <Plus className="w-4 h-4 mr-1.5" /> Add Product
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -226,6 +233,20 @@ export default function ProductsPage() {
         onClose={() => { setShowAdd(false); setEditProduct(null); }}
         product={editProduct as any}
         onSaved={handleSaved}
+      />
+
+      <BulkImportDialog
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        title="Bulk import products"
+        headers={['name', 'sku', 'category', 'brand', 'unit', 'description', 'costPrice', 'sellingPrice', 'currentStock', 'lowStockThreshold', 'supplierName']}
+        sampleRow={{
+          name: 'Sample Perfume 50ml', sku: '', category: 'Perfumes', brand: 'Sample Brand', unit: 'Piece',
+          description: 'Optional description', costPrice: '150', sellingPrice: '250', currentStock: '20', lowStockThreshold: '5', supplierName: '',
+        }}
+        templateFilename="gwm-products-template.csv"
+        onImport={rows => bulkImportProducts({ rows })}
+        onDone={handleSaved}
       />
 
       <StockMovementDialog

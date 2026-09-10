@@ -127,6 +127,10 @@ const supplierTerms: Term[] = [
     formula: 'Balance = Total Share − Total Paid',
     explanation: 'The Payouts page shows what each supplier has earned vs what you\'ve actually paid them. Use "Mark as Paid" whenever you pay a supplier — it logs the amount and date, and the balance owed updates automatically.',
   },
+  {
+    term: 'Bulk Import',
+    explanation: 'On the Products page, "Bulk Import" lets you add many products at once from a CSV file instead of one at a time. Download the template first to get the exact column names, fill it in (in Excel, Sheets, or Numbers), then upload it — rows with a problem are skipped and listed so you can fix and re-upload just those.',
+  },
 ];
 
 export default function HelpPage() {

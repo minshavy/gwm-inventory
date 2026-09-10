@@ -398,6 +398,68 @@ app.post('/api/supplier/addCategory', requireSupplier, (req, res) => {
   res.json({ success: true, id });
 });
 
+app.post('/api/supplier/bulkImportProducts', requireSupplier, (req, res) => {
+  const { rows } = req.body || {};
+  const supplierId = req.user.supplierId;
+  if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'No rows to import' });
+  if (rows.length > 500) return res.status(400).json({ error: 'Max 500 rows per import — split into smaller batches.' });
+
+  const insertProduct = db.prepare(`
+    INSERT INTO "Products" (id, name, sku, category, brand, unit, description, costPrice, currentStock, lowStockThreshold, status, createdByUserId)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+  `);
+  const linkSupplier = db.prepare(`INSERT INTO "ProductsSuppliers" (productsId, suppliersId) VALUES (?,?)`);
+  const insertMove = db.prepare(`INSERT INTO "StockMovements" (id, reference, type, quantity, notes, recordedBy) VALUES (?,?,?,?,?,?)`);
+  const linkMove = db.prepare(`INSERT INTO "ProductsStockMovements" (productsId, stockMovementsId) VALUES (?,?)`);
+  const linkMoveSupplier = db.prepare(`INSERT INTO "StockMovementsSuppliers" (stockMovementsId, suppliersId) VALUES (?,?)`);
+
+  const results = { inserted: 0, errors: [] };
+  rows.forEach((r, idx) => {
+    const rowNum = idx + 2;
+    const name = (r.name || '').trim();
+    if (!name) { results.errors.push({ row: rowNum, error: 'Missing product name — row skipped' }); return; }
+
+    const costPrice = r.costPrice !== undefined && r.costPrice !== '' ? Number(r.costPrice) : null;
+    const currentStock = r.currentStock !== undefined && r.currentStock !== '' ? Number(r.currentStock) : 0;
+    const lowStockThreshold = r.lowStockThreshold !== undefined && r.lowStockThreshold !== '' ? Number(r.lowStockThreshold) : 10;
+
+    if ([costPrice, currentStock, lowStockThreshold].some(v => v !== null && Number.isNaN(v))) {
+      results.errors.push({ row: rowNum, error: 'costPrice, currentStock, or lowStockThreshold is not a valid number — row skipped' });
+      return;
+    }
+
+    const id = uuid();
+    const sku = (r.sku || '').trim() || `SUP-${Date.now().toString(36).toUpperCase()}${idx}`;
+    const status = currentStock <= 0 ? 'Out of Stock' : 'Active';
+
+    insertProduct.run(
+      id, name, sku, r.category || null, r.brand || null, r.unit || 'Piece', r.description || null,
+      costPrice, currentStock, lowStockThreshold, status, req.user.id
+    );
+    linkSupplier.run(id, supplierId);
+
+    if (currentStock > 0) {
+      const moveId = uuid();
+      const ref = nextCounter('StockMovements', 'reference');
+      insertMove.run(moveId, ref, 'Stock In', currentStock, 'Added by supplier (bulk import)', req.user.username);
+      linkMove.run(id, moveId);
+      linkMoveSupplier.run(moveId, supplierId);
+    }
+    results.inserted++;
+  });
+
+  if (results.inserted > 0) {
+    const supplier = db.prepare(`SELECT name FROM "Suppliers" WHERE id = ?`).get(supplierId);
+    db.prepare(`INSERT INTO "Notifications" (id, type, message, productId) VALUES (?,?,?,?)`).run(
+      uuid(), 'supplier_bulk_import',
+      `${supplier?.name || 'A supplier'} bulk-added ${results.inserted} new product${results.inserted === 1 ? '' : 's'} via CSV import — set selling prices to activate them.`,
+      null
+    );
+  }
+
+  res.json({ success: true, ...results });
+});
+
 // Suppliers can no longer delete their own products — only edit them.
 // If a product genuinely needs to go, the admin discontinues/removes it.
 app.post('/api/supplier/deleteProduct', requireSupplier, (req, res) => {
@@ -482,6 +544,56 @@ app.post('/api/deleteProduct', requireAdmin, (req, res) => {
   db.prepare(`DELETE FROM "Notifications" WHERE productId=?`).run(id);
   db.prepare(`DELETE FROM "Products" WHERE id=?`).run(id);
   res.json({ success: true });
+});
+
+app.post('/api/bulkImportProducts', requireAdmin, (req, res) => {
+  const { rows } = req.body || {};
+  if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ error: 'No rows to import' });
+  if (rows.length > 500) return res.status(400).json({ error: 'Max 500 rows per import — split into smaller batches.' });
+
+  const suppliersByName = new Map(
+    db.prepare(`SELECT id, name FROM "Suppliers"`).all().map(s => [s.name.trim().toLowerCase(), s.id])
+  );
+  const insertProduct = db.prepare(`
+    INSERT INTO "Products" (id, name, sku, category, brand, unit, description, costPrice, sellingPrice, unitPrice, currentStock, lowStockThreshold, status)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+  `);
+  const linkSupplier = db.prepare(`INSERT INTO "ProductsSuppliers" (productsId, suppliersId) VALUES (?,?)`);
+
+  const results = { inserted: 0, errors: [] };
+  rows.forEach((r, idx) => {
+    const rowNum = idx + 2; // +2 accounts for the header row the person sees in their spreadsheet
+    const name = (r.name || '').trim();
+    if (!name) { results.errors.push({ row: rowNum, error: 'Missing product name — row skipped' }); return; }
+
+    const costPrice = r.costPrice !== undefined && r.costPrice !== '' ? Number(r.costPrice) : null;
+    const sellingPrice = r.sellingPrice !== undefined && r.sellingPrice !== '' ? Number(r.sellingPrice) : null;
+    const currentStock = r.currentStock !== undefined && r.currentStock !== '' ? Number(r.currentStock) : 0;
+    const lowStockThreshold = r.lowStockThreshold !== undefined && r.lowStockThreshold !== '' ? Number(r.lowStockThreshold) : 20;
+
+    if ([costPrice, sellingPrice, currentStock, lowStockThreshold].some(v => v !== null && Number.isNaN(v))) {
+      results.errors.push({ row: rowNum, error: 'costPrice, sellingPrice, currentStock, or lowStockThreshold is not a valid number — row skipped' });
+      return;
+    }
+
+    const id = uuid();
+    const sku = (r.sku || '').trim() || `AUTO-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+
+    insertProduct.run(
+      id, name, sku, r.category || null, r.brand || null, r.unit || 'Piece', r.description || null,
+      costPrice, sellingPrice, sellingPrice, currentStock, lowStockThreshold, 'Active'
+    );
+
+    const supplierName = (r.supplierName || '').trim();
+    if (supplierName) {
+      const supplierId = suppliersByName.get(supplierName.toLowerCase());
+      if (supplierId) linkSupplier.run(id, supplierId);
+      else results.errors.push({ row: rowNum, error: `Added, but supplier "${supplierName}" wasn't found — left unassigned` });
+    }
+    results.inserted++;
+  });
+
+  res.json({ success: true, ...results });
 });
 
 // ---------- Stock movements (admin only) ----------

@@ -55,6 +55,10 @@ const terms: Term[] = [
     formula: 'Balance = Total Share − Paid so far',
     explanation: "\"Paid so far\" is what the admin has actually paid you, logged whenever they mark a payout. \"Balance owed\" is what's left — it updates automatically as you earn more or get paid.",
   },
+  {
+    term: 'Bulk Import',
+    explanation: 'On the Products tab, "Bulk Import" lets you add many products at once from a CSV file instead of one at a time. Download the template first, fill it in, then upload it — any row with a problem is listed so you can fix and re-upload just that one.',
+  },
 ];
 
 export default function SupplierHelpPage() {
