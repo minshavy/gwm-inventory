@@ -139,7 +139,7 @@ export default function PayoutsPage() {
                     <Button variant="outline" size="sm" onClick={() => openHistory(b)}>
                       <History className="w-3.5 h-3.5 mr-1.5" /> History
                     </Button>
-                    <Button size="sm" onClick={() => openPayDialog(b)} disabled={b.balance <= 0}>
+                    <Button size="sm" onClick={() => openPayDialog(b)} disabled={b.balance <= 0.005}>
                       Mark as Paid
                     </Button>
                   </div>
@@ -227,9 +227,10 @@ export default function PayoutsPage() {
               <Button
                 className="w-full"
                 variant="outline"
+                disabled={historyData.balance <= 0.005}
                 onClick={() => openPayDialog({ supplierId: historyTarget.supplierId, supplierName: historyTarget.supplierName, balance: historyData.balance })}
               >
-                Record another payout
+                {historyData.balance <= 0.005 ? 'Nothing owed right now' : 'Record another payout'}
               </Button>
             </div>
           )}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getSales, recordSale, deleteSale, getLookups, getProducts } from '@/lib/api-client';
+import { getSales, recordSale, deleteSale, getLookups, getProducts, printReceipt } from '@/lib/api-client';
 import { Button } from '@project/components/ui/button';
 import { Input } from '@project/components/ui/input';
 import { Label } from '@project/components/ui/label';
@@ -10,7 +10,7 @@ import { Skeleton } from '@project/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@project/components/ui/alert-dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@project/components/ui/popover';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { Plus, Search, Trash2, ShoppingCart, ChevronsUpDown, Check } from 'lucide-react';
+import { Plus, Search, Trash2, ShoppingCart, ChevronsUpDown, Check, Printer, Loader2 } from 'lucide-react';
 import { cn } from '@project/components/lib/utils';
 import { toast } from 'sonner';
 import NumericInput from '../components/NumericInput';
@@ -27,6 +27,19 @@ export default function SalesPage() {
   const [dateTo, setDateTo] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [printingId, setPrintingId] = useState<string | null>(null);
+
+  const handlePrintReceipt = async (saleId: string) => {
+    setPrintingId(saleId);
+    try {
+      const res = await printReceipt({ saleId });
+      window.open(res.url, '_blank');
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to generate receipt');
+    } finally {
+      setPrintingId(null);
+    }
+  };
   const [saving, setSaving] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -96,7 +109,7 @@ export default function SalesPage() {
     if (form.quantity <= 0) { toast.error('Quantity must be positive'); return; }
     setSaving(true);
     try {
-      await recordSale({
+      const result = await recordSale({
         productId: form.productId,
         quantity: form.quantity,
         sellingPrice: form.sellingPrice,
@@ -106,7 +119,9 @@ export default function SalesPage() {
         date: form.date,
         notes: form.notes || undefined,
       });
-      toast.success('Sale recorded');
+      toast.success('Sale recorded', {
+        action: { label: 'Print Receipt', onClick: () => handlePrintReceipt(result.id) },
+      });
       setDialogOpen(false);
       load();
     } catch (e: any) {
@@ -173,6 +188,9 @@ export default function SalesPage() {
               <div key={s.id} className="bg-card border rounded-lg p-3 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-sm truncate flex-1">{s.productName}</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePrintReceipt(s.id)} disabled={printingId === s.id}>
+                    {printingId === s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 -mr-1" onClick={() => setDeleteId(s.id)}>
                     <Trash2 className="w-3.5 h-3.5 text-destructive" />
                   </Button>
@@ -220,6 +238,9 @@ export default function SalesPage() {
                       {s.paymentMethod && <Badge variant="secondary">{s.paymentMethod}</Badge>}
                     </td>
                     <td className="px-4 py-3 text-right">
+                      <Button variant="ghost" size="icon" onClick={() => handlePrintReceipt(s.id)} disabled={printingId === s.id}>
+                        {printingId === s.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => setDeleteId(s.id)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
@@ -307,15 +328,15 @@ export default function SalesPage() {
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><Label>Quantity</Label><NumericInput min={1} value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: Number(e.target.value) }))} /></div>
               <div><Label>Date</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><Label>Selling Price</Label><NumericInput min={0} step={0.01} value={form.sellingPrice} onChange={e => setForm(f => ({ ...f, sellingPrice: Number(e.target.value) }))} /></div>
               <div><Label>Cost Price</Label><NumericInput min={0} step={0.01} value={form.costPrice} onChange={e => setForm(f => ({ ...f, costPrice: Number(e.target.value) }))} /></div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><Label>Discount</Label><NumericInput min={0} step={0.01} value={form.discount} onChange={e => setForm(f => ({ ...f, discount: Number(e.target.value) }))} /></div>
               <div>
                 <Label>Payment Method</Label>

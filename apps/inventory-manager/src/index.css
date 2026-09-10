@@ -73,33 +73,33 @@
   }
 
   .dark {
-    --background: 37.5000 36.3636% 95.6863%;
-    --foreground: 8.8889 27.8351% 19.0196%;
+    --background: 30 12% 9%;
+    --foreground: 37 20% 92%;
 
-    --card: 37.5000 36.3636% 95.6863%;
-    --card-foreground: 8.8889 27.8351% 19.0196%;
+    --card: 30 11% 13%;
+    --card-foreground: 37 20% 92%;
 
-    --popover: 37.5000 36.3636% 95.6863%;
-    --popover-foreground: 8.8889 27.8351% 19.0196%;
+    --popover: 30 11% 13%;
+    --popover-foreground: 37 20% 92%;
 
-    --primary: 123.0380 46.1988% 33.5294%;
+    --primary: 123.0380 40% 45%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 124.6154 39.3939% 93.5294%;
-    --secondary-foreground: 124.4776 55.3719% 23.7255%;
+    --secondary: 124 18% 18%;
+    --secondary-foreground: 124 30% 85%;
 
-    --muted: 33.7500 34.7826% 90.9804%;
-    --muted-foreground: 15.0000 25.2874% 34.1176%;
+    --muted: 30 10% 17%;
+    --muted-foreground: 30 8% 65%;
 
-    --accent: 122 37.5000% 84.3137%;
-    --accent-foreground: 124.4776 55.3719% 23.7255%;
+    --accent: 122 22% 20%;
+    --accent-foreground: 122 40% 85%;
 
-    --destructive: 0 66.3866% 46.6667%;
+    --destructive: 0 60% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 33.9130 27.0588% 83.3333%;
-    --input: 33.9130 27.0588% 83.3333%;
-    --ring: 123.0380 46.1988% 33.5294%;
+    --border: 30 10% 22%;
+    --input: 30 10% 22%;
+    --ring: 123.0380 40% 45%;
 
     --chart-1: 213.1169 93.9024% 67.8431%;
     --chart-2: 217.2193 91.2195% 59.8039%;
@@ -108,13 +108,13 @@
     --chart-5: 225.9310 70.7317% 40.1961%;
 
     --sidebar-background: 0 0% 9.0196%;
-    --sidebar-foreground: 8.8889 27.8351% 19.0196%;
-    --sidebar-primary: 123.0380 46.1988% 33.5294%;
+    --sidebar-foreground: 0 0% 92%;
+    --sidebar-primary: 123.0380 45% 45%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 122 37.5000% 84.3137%;
-    --sidebar-accent-foreground: 124.4776 55.3719% 23.7255%;
-    --sidebar-border: 33.9130 27.0588% 83.3333%;
-    --sidebar-ring: 123.0380 46.1988% 33.5294%;
+    --sidebar-accent: 122 25% 20%;
+    --sidebar-accent-foreground: 122 40% 85%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 123.0380 40% 45%;
   }
 }
 

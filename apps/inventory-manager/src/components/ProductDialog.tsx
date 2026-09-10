@@ -216,7 +216,7 @@ export default function ProductDialog({ open, onClose, product, onSaved }: Props
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>Category</Label>
               {showNewCat ? (
@@ -242,14 +242,14 @@ export default function ProductDialog({ open, onClose, product, onSaved }: Props
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5"><Label>Brand</Label><Input value={brand} onChange={e => setBrand(e.target.value)} placeholder="e.g. Samsung" /></div>
             <div className="grid gap-1.5"><Label>Unit</Label><Input value={unit} onChange={e => setUnit(e.target.value)} placeholder="e.g. Piece, Box, Kg" /></div>
           </div>
 
           <div className="grid gap-1.5"><Label>Description</Label><Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" rows={2} /></div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5"><Label>Cost Price (MVR)</Label><Input type="number" min="0" step="0.01" value={costPrice} onChange={e => setCostPrice(e.target.value)} placeholder="0.00" /></div>
             <div className="grid gap-1.5"><Label>Selling Price (MVR)</Label><Input type="number" min="0" step="0.01" value={sellingPrice} onChange={e => setSellingPrice(e.target.value)} placeholder="0.00" /></div>
           </div>
@@ -261,7 +261,7 @@ export default function ProductDialog({ open, onClose, product, onSaved }: Props
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="grid gap-1.5"><Label>Stock</Label><Input type="number" min="0" value={currentStock} onChange={e => setCurrentStock(e.target.value)} /></div>
             <div className="grid gap-1.5"><Label>Low Threshold</Label><Input type="number" min="0" value={lowStockThreshold} onChange={e => setLowStockThreshold(e.target.value)} /></div>
             <div className="grid gap-1.5">

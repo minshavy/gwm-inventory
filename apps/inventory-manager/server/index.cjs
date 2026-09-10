@@ -152,7 +152,15 @@ app.post('/api/getNotifications', requireAdmin, (req, res) => {
     ORDER BY n.created_at DESC LIMIT 50
   `).all();
   const unreadCount = db.prepare(`SELECT COUNT(*) AS c FROM "Notifications" WHERE isRead = 0`).get().c;
-  res.json({ notifications: rows, unreadCount });
+
+  // Live-computed (not stored) counts for the Sales and Payouts nav badges —
+  // these reflect current state rather than a dismissible event log.
+  const unpricedProductCount = db.prepare(`
+    SELECT COUNT(*) AS c FROM "Products" WHERE sellingPrice IS NULL OR sellingPrice <= 0
+  `).get().c;
+  const suppliers = db.prepare(`SELECT id FROM "Suppliers"`).all();
+  const suppliersOwedCount = suppliers.filter(s => getSupplierEarnings(s.id).balance > 0.005).length;
+  res.json({ notifications: rows, unreadCount, unpricedProductCount, suppliersOwedCount });
 });
 
 app.post('/api/markNotificationsRead', requireAdmin, (req, res) => {
@@ -1089,7 +1097,7 @@ app.post('/api/getProfitLoss', requireAdmin, (req, res) => {
 });
 
 // ---------- PDF Export ----------
-const { buildSalesReport, buildExpensesReport, buildStockReport, buildProfitLossReport } = require('./pdf-templates.cjs');
+const { buildSalesReport, buildExpensesReport, buildStockReport, buildProfitLossReport, buildReceipt } = require('./pdf-templates.cjs');
 const fsSync = require('fs');
 const pathMod = require('path');
 
@@ -1156,6 +1164,28 @@ app.post('/api/exportPdf', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error('PDF export failed:', err);
     res.status(500).json({ error: 'Failed to generate PDF' });
+  }
+});
+
+app.post('/api/printReceipt', requireAdmin, async (req, res) => {
+  try {
+    const { saleId } = req.body || {};
+    const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const html = buildReceipt(db, saleId, now);
+    if (!html) return res.status(404).json({ error: 'Sale not found' });
+
+    const browser = await getBrowser();
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pdfBuffer = await page.pdf({ format: 'a5', printBackground: true });
+    await page.close();
+
+    const filename = `receipt-${uuid()}.pdf`;
+    fsSync.writeFileSync(pathMod.join(EXPORTS_DIR, filename), pdfBuffer);
+    res.json({ url: `/exports/${filename}` });
+  } catch (err) {
+    console.error('Receipt generation failed:', err);
+    res.status(500).json({ error: 'Failed to generate receipt' });
   }
 });
 

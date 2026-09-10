@@ -47,13 +47,20 @@ export default function DashboardPage() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [notifLoading, setNotifLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unpricedProductCount, setUnpricedProductCount] = useState(0);
+  const [suppliersOwedCount, setSuppliersOwedCount] = useState(0);
   const [actingOn, setActingOn] = useState<string | null>(null);
   const navigate = useNavigate();
   const stockAlertsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     getDashboard({}).then(setData).finally(() => setLoading(false));
-    getNotifications().then(res => { setNotifications(res.notifications); setUnreadCount(res.unreadCount); }).catch(() => {}).finally(() => setNotifLoading(false));
+    getNotifications().then(res => {
+      setNotifications(res.notifications);
+      setUnreadCount(res.unreadCount);
+      setUnpricedProductCount(res.unpricedProductCount);
+      setSuppliersOwedCount(res.suppliersOwedCount);
+    }).catch(() => {}).finally(() => setNotifLoading(false));
   }, []);
 
   const handleMarkAllRead = async () => {
@@ -139,10 +146,36 @@ export default function DashboardPage() {
         </div>
         {notifLoading ? (
           <Skeleton className="h-10 rounded" />
-        ) : notifications.length === 0 ? (
+        ) : notifications.length === 0 && unpricedProductCount === 0 && suppliersOwedCount === 0 ? (
           <p className="text-sm text-muted-foreground py-2">You don't have any new notifications from suppliers right now.</p>
         ) : (
           <div className="space-y-1.5">
+            {unpricedProductCount > 0 && (
+              <button
+                onClick={() => navigate('/sales')}
+                className="w-full flex items-center justify-between gap-3 p-2.5 rounded border bg-amber-500/5 border-amber-500/20 text-left transition-colors hover:bg-amber-500/10"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm">
+                    {unpricedProductCount} product{unpricedProductCount === 1 ? '' : 's'} {unpricedProductCount === 1 ? "doesn't" : "don't"} have a selling price yet — they can't be sold until priced.
+                  </p>
+                </div>
+                <span className="flex items-center gap-1 text-xs text-primary flex-shrink-0 font-medium">Go to Sales <ArrowRight className="w-3.5 h-3.5" /></span>
+              </button>
+            )}
+            {suppliersOwedCount > 0 && (
+              <button
+                onClick={() => navigate('/payouts')}
+                className="w-full flex items-center justify-between gap-3 p-2.5 rounded border bg-amber-500/5 border-amber-500/20 text-left transition-colors hover:bg-amber-500/10"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm">
+                    {suppliersOwedCount} supplier{suppliersOwedCount === 1 ? '' : 's'} {suppliersOwedCount === 1 ? 'is' : 'are'} owed a payout.
+                  </p>
+                </div>
+                <span className="flex items-center gap-1 text-xs text-primary flex-shrink-0 font-medium">Go to Payouts <ArrowRight className="w-3.5 h-3.5" /></span>
+              </button>
+            )}
             {notifications.slice(0, 8).map(n => {
               if (n.type === 'stock_request') {
                 return (

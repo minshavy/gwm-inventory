@@ -268,4 +268,68 @@ function buildProfitLossReport(db, input, period, generatedDate) {
   </body></html>`;
 }
 
-module.exports = { buildSalesReport, buildExpensesReport, buildStockReport, buildProfitLossReport };
+function buildReceipt(db, saleId, generatedDate) {
+  const sale = db.prepare(`
+    SELECT s.*, p.name AS productName, pm.name AS paymentMethod
+    FROM "Sales" s
+    LEFT JOIN "ProductsSales" pl ON pl.salesId = s.id
+    LEFT JOIN "Products" p ON p.id = pl.productsId
+    LEFT JOIN "PaymentMethodsSales" pml ON pml.salesId = s.id
+    LEFT JOIN "PaymentMethods" pm ON pm.id = pml.paymentMethodsId
+    WHERE s.id = ?
+  `).get(saleId);
+  if (!sale) return null;
+
+  const lineTotal = safeNum(sale.sellingPrice) * safeNum(sale.quantity);
+
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+    @page { size: A5; margin: 0.4in; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #1a1a2e; font-size: 10pt; }
+    .wrap { max-width: 380px; margin: 0 auto; }
+    .center { text-align: center; }
+    .row { display: flex; justify-content: space-between; }
+    h1 { font-size: 16pt; margin: 0 0 2px; font-weight: 700; }
+    .muted { color: #64748b; font-size: 8.5pt; }
+    .divider { border-top: 1.5px dashed #cbd5e1; margin: 12px 0; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    th { text-align: left; font-size: 8pt; font-weight: 600; color: #475569; border-bottom: 1px solid #cbd5e1; padding: 4px 4px 4px 0; text-transform: uppercase; letter-spacing: 0.03em; }
+    td { padding: 7px 4px 7px 0; font-size: 9.5pt; }
+    td.num, th.num { text-align: right; }
+    .totals td { padding: 3px 4px 3px 0; font-size: 9.5pt; }
+    .totals .grand td { border-top: 1.5px solid #1a1a2e; font-weight: 700; font-size: 12pt; padding-top: 8px; }
+    .footer { margin-top: 24px; text-align: center; font-size: 8.5pt; color: #94a3b8; }
+  </style></head><body>
+    <div class="wrap">
+      <div class="center">
+        <h1>GWM Inventory</h1>
+        <div class="muted">Sales Receipt</div>
+      </div>
+      <div class="divider"></div>
+      <div class="row muted">
+        <span>Receipt #${safeNum(sale.saleId)}</span>
+        <span>${sale.date ? String(sale.date).slice(0, 10) : ''}</span>
+      </div>
+      <table>
+        <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Total</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>${escapeHtml(sale.productName || 'Product')}</td>
+            <td class="num">${safeNum(sale.quantity)}</td>
+            <td class="num">${fmtMvr(safeNum(sale.sellingPrice))}</td>
+            <td class="num">${fmtMvr(lineTotal)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="divider"></div>
+      <table class="totals">
+        <tr><td>Subtotal</td><td class="num">${fmtMvr(lineTotal)}</td></tr>
+        ${safeNum(sale.discount) > 0 ? `<tr><td>Discount</td><td class="num">-${fmtMvr(safeNum(sale.discount))}</td></tr>` : ''}
+        <tr class="grand"><td>Total</td><td class="num">${fmtMvr(safeNum(sale.revenue))}</td></tr>
+      </table>
+      ${sale.paymentMethod ? `<div class="muted center" style="margin-top:6px;">Paid via ${escapeHtml(sale.paymentMethod)}</div>` : ''}
+      <div class="footer">Thank you for your purchase!<br/>Generated ${escapeHtml(generatedDate)}</div>
+    </div>
+  </body></html>`;
+}
+
+module.exports = { buildSalesReport, buildExpensesReport, buildStockReport, buildProfitLossReport, buildReceipt };

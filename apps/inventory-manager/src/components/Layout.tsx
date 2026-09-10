@@ -3,12 +3,13 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, ArrowLeftRight, ShoppingCart,
   Receipt, TrendingUp, BarChart3, Tags, Tag, Truck, CreditCard,
-  Menu, X, ChevronLeft, LogOut, HelpCircle, HandCoins,
+  Menu, X, ChevronLeft, LogOut, HelpCircle, HandCoins, Sun, Moon,
 } from 'lucide-react';
 import { cn } from '@project/components/lib/utils';
 import { Button } from '@project/components/ui/button';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth-shim';
+import { useTheme } from '@/lib/theme-provider';
 import { getNotifications } from '@/lib/api-client';
 import { BackToTopButton } from '@/components/BackToTopButton';
 
@@ -28,7 +29,7 @@ const navItems = [
   { to: '/help', label: 'Help & Guide', icon: HelpCircle },
 ];
 
-function SidebarContent({ onNavigate, unreadCount = 0 }: { onNavigate?: () => void; unreadCount?: number }) {
+function SidebarContent({ onNavigate, badges = {} }: { onNavigate?: () => void; badges?: Record<string, number> }) {
   const navigate = useNavigate();
   return (
     <div className="flex flex-col h-full">
@@ -65,9 +66,9 @@ function SidebarContent({ onNavigate, unreadCount = 0 }: { onNavigate?: () => vo
           >
             <Icon className="w-4 h-4 flex-shrink-0" />
             {label}
-            {to === '/' && unreadCount > 0 && (
+            {!!badges[to] && (
               <span className="ml-auto text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                {unreadCount > 9 ? '9+' : unreadCount}
+                {badges[to] > 9 ? '9+' : badges[to]}
               </span>
             )}
           </NavLink>
@@ -80,13 +81,18 @@ function SidebarContent({ onNavigate, unreadCount = 0 }: { onNavigate?: () => vo
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [badges, setBadges] = useState<Record<string, number>>({});
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
-    const poll = () => getNotifications().then(res => setUnreadCount(res.unreadCount)).catch(() => {});
+    const poll = () => getNotifications().then(res => setBadges({
+      '/': res.unreadCount,
+      '/sales': res.unpricedProductCount,
+      '/payouts': res.suppliersOwedCount,
+    })).catch(() => {});
     poll();
     const id = setInterval(poll, 20000);
     return () => clearInterval(id);
@@ -135,7 +141,7 @@ export default function Layout() {
                   }
                 >
                   <Icon className="w-4 h-4" />
-                  {to === '/' && unreadCount > 0 && (
+                  {!!badges[to] && (
                     <span className="absolute top-1 right-1.5 w-2 h-2 rounded-full bg-destructive" />
                   )}
                 </NavLink>
@@ -149,9 +155,13 @@ export default function Layout() {
           </div>
         ) : (
           <>
-            <SidebarContent unreadCount={unreadCount} />
+            <SidebarContent badges={badges} />
             <div className="p-2 border-t space-y-1">
               <div className="px-2 py-1 text-xs text-muted-foreground truncate">{user?.username}</div>
+              <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground" onClick={toggleTheme}>
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                <span className="text-xs">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+              </Button>
               <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground" onClick={logout}>
                 <LogOut className="w-4 h-4" />
                 <span className="text-xs">Log out</span>
@@ -174,9 +184,14 @@ export default function Layout() {
           <Package className="w-4 h-4 text-primary flex-shrink-0" />
           <span className="font-semibold text-sm truncate">GWM Inventory</span>
         </button>
-        <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)}>
-          <Menu className="w-5 h-5" />
-        </Button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Button variant="ghost" size="icon" onClick={toggleTheme}>
+            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)}>
+            <Menu className="w-5 h-5" />
+          </Button>
+        </div>
       </header>
 
       {/* Mobile slide-in */}
@@ -235,16 +250,20 @@ export default function Layout() {
                   >
                     <Icon className="w-4 h-4 flex-shrink-0" />
                     {label}
-                    {to === '/' && unreadCount > 0 && (
+                    {!!badges[to] && (
                       <span className="ml-auto text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                        {unreadCount > 9 ? '9+' : unreadCount}
+                        {badges[to] > 9 ? '9+' : badges[to]}
                       </span>
                     )}
                   </NavLink>
                 ))}
               </nav>
-              <div className="p-2 border-t">
+              <div className="p-2 border-t space-y-1">
                 <div className="px-2 py-1 text-xs text-muted-foreground truncate">{user?.username}</div>
+                <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground" onClick={toggleTheme}>
+                  {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  <span className="text-xs">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+                </Button>
                 <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground" onClick={logout}>
                   <LogOut className="w-4 h-4" />
                   <span className="text-xs">Log out</span>

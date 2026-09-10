@@ -19,6 +19,18 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="GWM Inventory" />
+
+    <!-- Applies the saved theme before first paint, so there's no flash of
+         the wrong theme while the app loads. -->
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('gwm_theme');
+          var dark = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (dark) document.documentElement.classList.add('dark');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

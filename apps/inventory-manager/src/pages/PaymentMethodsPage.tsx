@@ -18,7 +18,7 @@ export default function PaymentMethodsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | undefined>();
-  const [form, setForm] = useState({ name: '', status: 'active' });
+  const [form, setForm] = useState({ name: '', status: 'Active' });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -35,10 +35,10 @@ export default function PaymentMethodsPage() {
   const openDialog = (pm?: any) => {
     if (pm) {
       setEditId(pm.id);
-      setForm({ name: pm.name, status: pm.status?.toLowerCase() ?? 'active' });
+      setForm({ name: pm.name, status: pm.status ?? 'Active' });
     } else {
       setEditId(undefined);
-      setForm({ name: '', status: 'active' });
+      setForm({ name: '', status: 'Active' });
     }
     setDialogOpen(true);
   };
@@ -114,8 +114,8 @@ export default function PaymentMethodsPage() {
               <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="disabled">Disabled</SelectItem>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Disabled">Disabled</SelectItem>
                 </SelectContent>
               </Select>
             </div>

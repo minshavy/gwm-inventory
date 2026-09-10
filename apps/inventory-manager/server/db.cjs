@@ -133,6 +133,14 @@ function init() {
   // Migration: track which product came from a supplier login (vs admin).
   ensureColumn('Products', 'createdByUserId', 'createdByUserId TEXT');
 
+  // Data fix: an earlier version of the Payment Methods form saved
+  // lowercase 'active'/'disabled' instead of 'Active'/'Disabled', which
+  // silently hid those payment methods from the Record Sale and Expense
+  // dropdowns (they filter on the capitalized value). Normalize any that
+  // slipped through. Safe to run every boot — a no-op once already fixed.
+  db.prepare(`UPDATE "PaymentMethods" SET status = 'Active' WHERE LOWER(status) = 'active' AND status != 'Active'`).run();
+  db.prepare(`UPDATE "PaymentMethods" SET status = 'Disabled' WHERE LOWER(status) = 'disabled' AND status != 'Disabled'`).run();
+
   // Seed the admin login exactly once, whether or not this is a brand new
   // database. Runs unconditionally (unlike the demo-data seed below) so it
   // still fires on an already-deployed Railway volume that predates logins.

@@ -55,6 +55,7 @@ export const bulkImportProducts = (input: any) => call('bulkImportProducts', inp
 export const getDashboard = (input: any) => call('getDashboard', input);
 export const getProfitLoss = (input: any) => call('getProfitLoss', input);
 export const exportPdf = (input: any) => call('exportPdf', input);
+export const printReceipt = (input: any) => call('printReceipt', input);
 export const downloadBackup = () => call('admin/downloadBackup', {});
 
 // ---- Auth / user management ----
@@ -89,7 +90,7 @@ export const api = {
   getExpenses, saveExpense, deleteExpense,
   getSuppliers, saveSupplier, deleteSupplier,
   getLookups, saveLookup, deleteLookup, bulkImportProducts,
-  getDashboard, getProfitLoss, exportPdf, downloadBackup,
+  getDashboard, getProfitLoss, exportPdf, printReceipt, downloadBackup,
   changePassword, getUsers, createSupplierLogin, resetPassword, setUserStatus,
   getSupplierSummary, saveSupplierProduct, addSupplierCategory, bulkImportSupplierProducts,
   getNotifications, markNotificationsRead, confirmStockUpdate, rejectStockUpdate,

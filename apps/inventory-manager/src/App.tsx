@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/lib/auth-shim';
+import { ThemeProvider } from '@/lib/theme-provider';
 import { Toaster } from '@project/components/ui/sonner';
 import Layout from './components/Layout';
 import SupplierLayout from './components/SupplierLayout';
@@ -95,10 +96,12 @@ function AppRoutes() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Toaster />
-        <AppRoutes />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <Toaster />
+          <AppRoutes />
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

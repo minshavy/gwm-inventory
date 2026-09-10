@@ -204,7 +204,7 @@ export default function ExpensesPage() {
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>{editId ? 'Edit Expense' : 'Add Expense'}</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><Label>Date</Label><Input type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></div>
               <div>
                 <Label>Category</Label>
@@ -217,7 +217,7 @@ export default function ExpensesPage() {
               </div>
             </div>
             <div><Label>Description</Label><Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What was this expense for?" /></div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><Label>Amount (MVR)</Label><NumericInput min={0} step={0.01} value={form.amount} onChange={e => setForm(f => ({ ...f, amount: Number(e.target.value) }))} /></div>
               <div>
                 <Label>Payment Method</Label>

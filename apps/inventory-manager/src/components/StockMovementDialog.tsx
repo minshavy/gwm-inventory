@@ -56,7 +56,7 @@ export default function StockMovementDialog({ open, onClose, product, onSaved }:
           {product && <DialogDescription><span className="font-medium text-foreground">{product.name}</span> — current stock: <strong className="tabular-nums">{product.currentStock}</strong></DialogDescription>}
         </DialogHeader>
         <div className="grid gap-4 py-2">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5">
               <Label>Movement Type</Label>
               <Select value={type} onValueChange={v => setType(v as typeof type)}>
@@ -71,7 +71,7 @@ export default function StockMovementDialog({ open, onClose, product, onSaved }:
             </div>
             <div className="grid gap-1.5"><Label>Quantity</Label><Input type="number" min="1" value={quantity} onChange={e => setQuantity(e.target.value)} /></div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="grid gap-1.5"><Label>Purchase Price (MVR)</Label><Input type="number" min="0" step="0.01" value={purchasePrice} onChange={e => setPurchasePrice(e.target.value)} placeholder="0.00" /></div>
             <div className="grid gap-1.5">
               <Label>Supplier</Label>
