@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getSales, getExpenses, getProducts, exportPdf } from '@/lib/api-client';
+import { getSales, getExpenses, getProducts, exportPdf, downloadBackup } from '@/lib/api-client';
 import { Button } from '@project/components/ui/button';
 import { Input } from '@project/components/ui/input';
 import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@project/components/ui/tabs';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { Download, BarChart3, FileText, Loader2 } from 'lucide-react';
+import { Download, BarChart3, FileText, Loader2, Database } from 'lucide-react';
 import { toast } from 'sonner';
 
 const fmt = (n: number) => `MVR ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -36,6 +36,7 @@ export default function ReportsPage() {
   const [totals, setTotals] = useState({ revenue: 0, cost: 0, profit: 0 });
   const [expenseTotal, setExpenseTotal] = useState(0);
   const [exporting, setExporting] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
 
   const loadReport = useCallback(async () => {
     setLoading(true);
@@ -94,9 +95,38 @@ export default function ReportsPage() {
     }
   };
 
+  const handleBackup = async () => {
+    setBackingUp(true);
+    try {
+      const res = await downloadBackup();
+      window.open(res.url, '_blank');
+      toast.success('Backup downloaded');
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to create backup');
+    } finally {
+      setBackingUp(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Reports</h1>
+
+      <div className="bg-card border rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-slate-500/10 text-slate-600 flex items-center justify-center flex-shrink-0">
+            <Database className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="font-medium text-sm">Full Database Backup</p>
+            <p className="text-xs text-muted-foreground">Downloads everything — products, sales, expenses, suppliers, logins — as one file, just in case.</p>
+          </div>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleBackup} disabled={backingUp} className="flex-shrink-0">
+          {backingUp ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+          {backingUp ? 'Preparing...' : 'Download Backup'}
+        </Button>
+      </div>
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>

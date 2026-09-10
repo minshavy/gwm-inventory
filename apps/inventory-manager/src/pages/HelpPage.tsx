@@ -131,6 +131,10 @@ const supplierTerms: Term[] = [
     term: 'Bulk Import',
     explanation: 'On the Products page, "Bulk Import" lets you add many products at once from a CSV file instead of one at a time. Download the template first to get the exact column names, fill it in (in Excel, Sheets, or Numbers), then upload it — rows with a problem are skipped and listed so you can fix and re-upload just those.',
   },
+  {
+    term: 'Database Backup',
+    explanation: 'On the Reports page, "Download Backup" saves a complete copy of everything in the app — every product, sale, expense, supplier, and login — as one file. Keep a copy somewhere safe every so often; if anything ever goes wrong, this file can restore everything exactly as it was.',
+  },
 ];
 
 export default function HelpPage() {

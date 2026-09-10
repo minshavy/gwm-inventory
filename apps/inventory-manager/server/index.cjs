@@ -1097,6 +1097,27 @@ const EXPORTS_DIR = pathMod.join(__dirname, 'exports');
 if (!fsSync.existsSync(EXPORTS_DIR)) fsSync.mkdirSync(EXPORTS_DIR, { recursive: true });
 app.use('/exports', express.static(EXPORTS_DIR));
 
+// ---------- Database backup ----------
+// A raw copy of the live SQLite file — the most direct "undo everything
+// going wrong" insurance. Restoring is just replacing data.db with this file.
+app.post('/api/admin/downloadBackup', requireAdmin, (req, res) => {
+  try {
+    // Flush any pending WAL-mode writes into the main file first, so the
+    // copy is complete and self-contained rather than missing recent writes.
+    db.pragma('wal_checkpoint(TRUNCATE)');
+  } catch (e) {
+    // Best-effort — still proceed with whatever is safely on disk.
+  }
+  try {
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const filename = `gwm-inventory-backup-${stamp}.db`;
+    fsSync.copyFileSync(db.name, pathMod.join(EXPORTS_DIR, filename));
+    res.json({ url: `/exports/${filename}`, filename });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to create backup file' });
+  }
+});
+
 let puppeteerBrowserPromise = null;
 function getBrowser() {
   if (!puppeteerBrowserPromise) {
