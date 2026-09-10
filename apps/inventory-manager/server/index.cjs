@@ -958,12 +958,24 @@ app.post('/api/getDashboard', requireAdmin, (req, res) => {
     ORDER BY currentStock ASC LIMIT 30
   `).all();
 
-  const salesOverTime = db.prepare(`
+  const salesByDateRows = db.prepare(`
     SELECT strftime('%Y-%m-%d', date) AS date, COALESCE(SUM(revenue),0) AS revenue, COALESCE(SUM(profit),0) AS profit
     FROM "Sales"
-    WHERE date IS NOT NULL AND date >= date('now', '-30 days')
-    GROUP BY 1 ORDER BY 1 ASC
+    WHERE date IS NOT NULL AND date >= date('now', '-29 days')
+    GROUP BY 1
   `).all();
+  const salesByDate = Object.fromEntries(salesByDateRows.map(r => [r.date, r]));
+  // Build a full 30-day run (today + the 29 days before it) so the trend
+  // line shows every day, including zero-sales days, instead of skipping
+  // straight from one sale to the next.
+  const salesOverTime = [];
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const row = salesByDate[key];
+    salesOverTime.push({ date: key, revenue: row?.revenue ?? 0, profit: row?.profit ?? 0 });
+  }
 
   const expensesByCategory = db.prepare(`
     SELECT COALESCE(ec.name,'Uncategorized') AS category, COALESCE(SUM(e.amount),0) AS amount
