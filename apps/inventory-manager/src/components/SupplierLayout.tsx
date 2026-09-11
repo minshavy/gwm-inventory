@@ -65,7 +65,9 @@ export default function SupplierLayout() {
 
   const [alertCount, setAlertCount] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
+  const [owedBadge, setOwedBadge] = useState(0);
   const prevCount = useRef<number | null>(null);
+  const prevOwed = useRef<number | null>(null);
 
   useEffect(() => {
     const poll = () => {
@@ -81,6 +83,13 @@ export default function SupplierLayout() {
           );
         }
         prevCount.current = count;
+
+        const owed = res.balance > 0.005 ? 1 : 0;
+        setOwedBadge(owed);
+        if (owed && prevOwed.current === 0) {
+          toast.success("You're owed a payout.", { description: 'Check the My Earnings tab.' });
+        }
+        prevOwed.current = owed;
       }).catch(() => {});
     };
     poll();
@@ -88,7 +97,7 @@ export default function SupplierLayout() {
     return () => clearInterval(id);
   }, []);
 
-  const badges = { '/stock': alertCount, '/': pendingCount };
+  const badges = { '/stock': alertCount, '/': pendingCount, '/earnings': owedBadge };
 
   return (
     <div className="min-h-screen bg-background flex">
