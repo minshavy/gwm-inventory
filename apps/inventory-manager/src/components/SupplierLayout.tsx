@@ -64,13 +64,16 @@ export default function SupplierLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const [alertCount, setAlertCount] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
   const prevCount = useRef<number | null>(null);
 
   useEffect(() => {
     const poll = () => {
       getSupplierSummary({}).then(res => {
-        const count = (res.products || []).filter((p: any) => p.stockFlag !== 'OK').length;
+        const products = res.products || [];
+        const count = products.filter((p: any) => p.stockFlag !== 'OK').length;
         setAlertCount(count);
+        setPendingCount(products.filter((p: any) => p.pendingStockRequest).length);
         if (count > 0 && (prevCount.current === null || count > prevCount.current)) {
           toast.warning(
             count === 1 ? 'One of your products is low or out of stock.' : `${count} of your products are low or out of stock.`,
@@ -85,7 +88,7 @@ export default function SupplierLayout() {
     return () => clearInterval(id);
   }, []);
 
-  const badges = { '/stock': alertCount };
+  const badges = { '/stock': alertCount, '/': pendingCount };
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -122,8 +125,11 @@ export default function SupplierLayout() {
           <Button variant="ghost" size="icon" onClick={toggleTheme}>
             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)}>
+          <Button variant="ghost" size="icon" className="relative" onClick={() => setMobileOpen(true)}>
             <Menu className="w-5 h-5" />
+            {Object.values(badges).some(v => v > 0) && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-destructive" />
+            )}
           </Button>
         </div>
       </header>

@@ -188,8 +188,11 @@ export default function Layout() {
           <Button variant="ghost" size="icon" onClick={toggleTheme}>
             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => setMobileOpen(true)}>
+          <Button variant="ghost" size="icon" className="relative" onClick={() => setMobileOpen(true)}>
             <Menu className="w-5 h-5" />
+            {Object.values(badges).some(v => v > 0) && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-destructive" />
+            )}
           </Button>
         </div>
       </header>
