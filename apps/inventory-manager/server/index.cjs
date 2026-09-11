@@ -1127,14 +1127,22 @@ app.post('/api/admin/downloadBackup', requireAdmin, (req, res) => {
 });
 
 let puppeteerBrowserPromise = null;
-function getBrowser() {
-  if (!puppeteerBrowserPromise) {
-    const puppeteer = require('puppeteer');
-    puppeteerBrowserPromise = puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+async function getBrowser() {
+  if (puppeteerBrowserPromise) {
+    const existing = await puppeteerBrowserPromise.catch(() => null);
+    if (existing && existing.isConnected && existing.isConnected()) return existing;
+    puppeteerBrowserPromise = null; // stale/dead browser — relaunch below
   }
+  const puppeteer = require('puppeteer');
+  puppeteerBrowserPromise = puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  }).catch((err) => {
+    // Don't cache a failed launch forever — let the next request try again
+    // instead of every PDF/receipt export failing until the server restarts.
+    puppeteerBrowserPromise = null;
+    throw err;
+  });
   return puppeteerBrowserPromise;
 }
 

@@ -32,7 +32,7 @@ const navItems = [
 function SidebarContent({ onNavigate, badges = {} }: { onNavigate?: () => void; badges?: Record<string, number> }) {
   const navigate = useNavigate();
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 min-h-0">
       <button
         onClick={() => { navigate('/'); onNavigate?.(); }}
         className="flex items-center gap-2 px-4 h-14 border-b text-left hover:bg-muted/50 transition-colors"
@@ -108,7 +108,7 @@ export default function Layout() {
         )}
       >
         {collapsed ? (
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col flex-1 min-h-0">
             <button
               onClick={() => navigate('/')}
               className="flex items-center justify-center h-14 border-b hover:bg-muted/50 transition-colors"
@@ -213,7 +213,7 @@ export default function Layout() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-              className="lg:hidden fixed top-0 right-0 bottom-0 z-50 w-64 bg-card/95 backdrop-blur-md border-l"
+              className="lg:hidden fixed top-0 right-0 bottom-0 z-50 w-64 bg-card/95 backdrop-blur-md border-l flex flex-col"
             >
               <div className="flex items-center justify-between px-4 h-14 border-b">
                 <div className="flex items-center gap-2">
