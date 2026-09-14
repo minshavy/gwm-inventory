@@ -1002,7 +1002,16 @@ app.post('/api/getDashboard', requireAdmin, (req, res) => {
   `).all();
 
   const grossProfit = ss.grossProfit ?? 0;
+
+  const setup = {
+    hasCategory: db.prepare(`SELECT COUNT(*) AS c FROM "Categories"`).get().c > 0,
+    hasProduct: (ps.totalProducts ?? 0) > 0,
+    hasSale: db.prepare(`SELECT COUNT(*) AS c FROM "Sales"`).get().c > 0,
+    hasSupplier: db.prepare(`SELECT COUNT(*) AS c FROM "Suppliers"`).get().c > 0,
+  };
+
   res.json({
+    setup,
     totalProducts: ps.totalProducts ?? 0,
     totalStockValue: ps.totalStockValue ?? 0,
     lowStockCount: ps.lowStockCount ?? 0,

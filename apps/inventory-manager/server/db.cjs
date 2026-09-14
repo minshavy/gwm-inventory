@@ -160,63 +160,19 @@ function init() {
   }
 
   const productCount = db.prepare('SELECT COUNT(*) AS c FROM "Products"').get().c;
-  if (productCount > 0) return; // demo data already seeded (or real data exists)
+  if (productCount > 0) return; // real data already exists — never touch it
 
-  const musk = uuid();
-  const s26 = uuid();
-  db.prepare(`
-    INSERT INTO "Products" (id, name, sku, category, brand, unit, costPrice, sellingPrice, currentStock, lowStockThreshold, status)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)
-  `).run(musk, 'Musk 10ml', 'ITM-M13196', 'Perfume', 'Lathafa', 'Piece', 70, 130, 97, 20, 'Active');
-  db.prepare(`
-    INSERT INTO "Products" (id, name, sku, category, brand, unit, costPrice, sellingPrice, currentStock, lowStockThreshold, status)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)
-  `).run(s26, 'S26 ultra', 'ITM-SU8002', 'Electronics', 'Samsung', 'Piece', 20000, 26000, 21, 20, 'Active');
-
-  db.prepare(`INSERT INTO "Categories" (id, name, prefix) VALUES (?,?,?)`).run(uuid(), 'Perfume', 'ITM');
-  db.prepare(`INSERT INTO "Categories" (id, name, prefix) VALUES (?,?,?)`).run(uuid(), 'Electronics', 'ITM');
-
-  ['Rent', 'Utilities', 'Salaries', 'Transport', 'Supplies', 'Other'].forEach(name => {
-    db.prepare(`INSERT INTO "ExpenseCategories" (id, name, status) VALUES (?,?,'Active')`).run(uuid(), name);
-  });
-
-  const cash = uuid();
-  const bank = uuid();
-  db.prepare(`INSERT INTO "PaymentMethods" (id, name, status) VALUES (?,?,?)`).run(cash, 'Cash', 'Active');
-  db.prepare(`INSERT INTO "PaymentMethods" (id, name, status) VALUES (?,?,?)`).run(bank, 'Bank Transfer', 'Active');
-
-  function addSale(saleId, productId, date, qty, sell, cost, paymentId) {
-    const id = uuid();
-    const revenue = qty * sell;
-    const totalCost = qty * cost;
-    const profit = revenue - totalCost;
-    db.prepare(`
-      INSERT INTO "Sales" (id, saleId, date, quantity, sellingPrice, costPrice, discount, revenue, totalCost, profit, recordedBy)
-      VALUES (?,?,?,?,?,?,0,?,?,?,'local-user')
-    `).run(id, saleId, date, qty, sell, cost, revenue, totalCost, profit);
-    db.prepare(`INSERT INTO "ProductsSales" (productsId, salesId) VALUES (?,?)`).run(productId, id);
-    db.prepare(`INSERT INTO "PaymentMethodsSales" (paymentMethodsId, salesId) VALUES (?,?)`).run(paymentId, id);
-    return { id, saleId };
+  // Only a starter set of expense categories is seeded on a fresh install —
+  // everything else (products, categories, payment methods, sales, stock
+  // movements, suppliers) starts empty so the app is a blank slate. Gated on
+  // ExpenseCategories itself (not productCount, which is always 0 now that
+  // no products are seeded) so this doesn't re-insert duplicates on restart.
+  const expenseCategoryCount = db.prepare('SELECT COUNT(*) AS c FROM "ExpenseCategories"').get().c;
+  if (expenseCategoryCount === 0) {
+    ['Rent', 'Utilities', 'Salaries', 'Transport', 'Supplies', 'Other'].forEach(name => {
+      db.prepare(`INSERT INTO "ExpenseCategories" (id, name, status) VALUES (?,?,'Active')`).run(uuid(), name);
+    });
   }
-
-  addSale(4, s26, '2026-08-23', 2, 26000, 20000, cash);
-  addSale(5, musk, '2026-08-23', 1, 130, 70, bank);
-  addSale(6, musk, '2026-08-23', 2, 130, 70, cash);
-
-  function addMovement(ref, productId, type, qty, price, notes) {
-    const id = uuid();
-    db.prepare(`
-      INSERT INTO "StockMovements" (id, reference, type, quantity, purchasePrice, notes, recordedBy)
-      VALUES (?,?,?,?,?,?,'local-user')
-    `).run(id, ref, type, qty, price ?? null, notes ?? null);
-    db.prepare(`INSERT INTO "ProductsStockMovements" (productsId, stockMovementsId) VALUES (?,?)`).run(productId, id);
-  }
-
-  addMovement(10, s26, 'Stock Out', 2, null, 'Sale #4');
-  addMovement(11, musk, 'Stock Out', 1, null, 'Sale #5');
-  addMovement(12, s26, 'Stock In', 7, 20000, null);
-  addMovement(13, s26, 'Stock In', 1, 20000, null);
-  addMovement(14, musk, 'Stock Out', 2, null, 'Sale #6');
 }
 
 init();

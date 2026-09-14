@@ -4,6 +4,7 @@ import { getDashboard, getNotifications, markNotificationsRead, confirmStockUpda
 import { Skeleton } from '@project/components/ui/skeleton';
 import { Button } from '@project/components/ui/button';
 import { Badge } from '@project/components/ui/badge';
+import { SetupChecklist } from '@/components/SetupChecklist';
 import {
   Package, DollarSign, TrendingUp, TrendingDown, AlertTriangle,
   XCircle, ShoppingCart, ArrowDown, Bell, ArrowRight, Check, X, Loader2,
@@ -134,6 +135,8 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Dashboard</h1>
+
+      {data.setup && <SetupChecklist setup={data.setup} />}
 
       <div className="bg-card border rounded-lg p-4">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
