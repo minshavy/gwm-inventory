@@ -1135,6 +1135,32 @@ app.post('/api/admin/downloadBackup', requireAdmin, (req, res) => {
   }
 });
 
+// Wipes every piece of business data — products, sales, expenses,
+// suppliers, categories, payment methods, supplier logins, notifications,
+// payouts — back to a completely blank install. The admin account itself
+// is never touched, so you can't lock yourself out. Requires the exact
+// confirmation phrase so this can't be triggered by an accidental click.
+app.post('/api/admin/resetAllData', requireAdmin, (req, res) => {
+  const { confirm } = req.body || {};
+  if (confirm !== 'RESET') return res.status(400).json({ error: 'Confirmation text did not match — nothing was deleted.' });
+
+  const tables = [
+    'ProductsSuppliers', 'ProductsStockMovements', 'ProductsSales',
+    'StockMovementsSuppliers', 'PaymentMethodsSales',
+    'ExpenseCategoriesExpenses', 'ExpensesPaymentMethods',
+    'StockMovements', 'Sales', 'Expenses', 'Products',
+    'Categories', 'ExpenseCategories', 'PaymentMethods', 'Suppliers',
+    'Notifications', 'StockUpdateRequests', 'SupplierPayouts',
+  ];
+  const wipe = db.transaction(() => {
+    for (const t of tables) db.prepare(`DELETE FROM "${t}"`).run();
+    db.prepare(`DELETE FROM "Users" WHERE role = 'supplier'`).run();
+  });
+  wipe();
+
+  res.json({ success: true });
+});
+
 let puppeteerBrowserPromise = null;
 async function getBrowser() {
   if (puppeteerBrowserPromise) {

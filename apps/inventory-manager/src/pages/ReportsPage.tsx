@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getSales, getExpenses, getProducts, exportPdf, downloadBackup } from '@/lib/api-client';
+import { getSales, getExpenses, getProducts, exportPdf, downloadBackup, resetAllData } from '@/lib/api-client';
 import { Button } from '@project/components/ui/button';
 import { Input } from '@project/components/ui/input';
 import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@project/components/ui/tabs';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { Download, BarChart3, FileText, Loader2, Database } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@project/components/ui/dialog';
+import { Download, BarChart3, FileText, Loader2, Database, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const fmt = (n: number) => `MVR ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -37,6 +38,9 @@ export default function ReportsPage() {
   const [expenseTotal, setExpenseTotal] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [backingUp, setBackingUp] = useState(false);
+  const [showReset, setShowReset] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   const loadReport = useCallback(async () => {
     setLoading(true);
@@ -108,6 +112,21 @@ export default function ReportsPage() {
     }
   };
 
+  const handleReset = async () => {
+    setResetting(true);
+    try {
+      await resetAllData({ confirm: resetConfirmText });
+      toast.success('Everything has been wiped — starting from a blank slate.');
+      setShowReset(false);
+      setResetConfirmText('');
+      window.location.href = '/';
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to reset');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Reports</h1>
@@ -125,6 +144,21 @@ export default function ReportsPage() {
         <Button variant="outline" size="sm" onClick={handleBackup} disabled={backingUp} className="flex-shrink-0">
           {backingUp ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
           {backingUp ? 'Preparing...' : 'Download Backup'}
+        </Button>
+      </div>
+
+      <div className="bg-destructive/5 border border-destructive/30 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-destructive/10 text-destructive flex items-center justify-center flex-shrink-0">
+            <AlertTriangle className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="font-medium text-sm">Reset All Data</p>
+            <p className="text-xs text-muted-foreground">Permanently deletes every product, sale, expense, supplier, and supplier login — back to a completely blank install. Your admin login is kept. This cannot be undone.</p>
+          </div>
+        </div>
+        <Button variant="destructive" size="sm" onClick={() => setShowReset(true)} className="flex-shrink-0">
+          Reset All Data
         </Button>
       </div>
 
@@ -318,6 +352,34 @@ export default function ReportsPage() {
         )}
       </Tabs>
 
+      <Dialog open={showReset} onOpenChange={o => { if (!o) { setShowReset(false); setResetConfirmText(''); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle className="text-destructive">Reset all data?</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              This permanently deletes every product, sale, expense, category, payment method, supplier, and
+              supplier login. Your own admin login is kept, but everything else is gone for good — there's no
+              undo. Consider downloading a backup first.
+            </p>
+            <p className="text-sm">Type <span className="font-mono font-bold">RESET</span> below to confirm.</p>
+            <Input
+              value={resetConfirmText}
+              onChange={e => setResetConfirmText(e.target.value)}
+              placeholder="RESET"
+              autoFocus
+            />
+            <Button
+              variant="destructive"
+              className="w-full"
+              disabled={resetConfirmText !== 'RESET' || resetting}
+              onClick={handleReset}
+            >
+              {resetting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              {resetting ? 'Resetting...' : 'Permanently delete everything'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
