@@ -51,6 +51,11 @@ export default function SupplierStockPage() {
               <div className="min-w-0">
                 <p className="font-medium truncate">{p.name}</p>
                 <p className="text-xs text-muted-foreground">{p.category || 'Uncategorized'} · Stock: {p.currentStock} / {p.lowStockThreshold} {p.unit}</p>
+                {p.stockFlag === 'Low Stock' && (
+                  <p className="text-xs text-muted-foreground">
+                    {p.daysLeft === null ? 'No recent sales' : p.daysLeft === 0 ? 'Selling out today' : `~${p.daysLeft} day${p.daysLeft === 1 ? '' : 's'} left at current pace`}
+                  </p>
+                )}
                 {p.pendingStockRequest && (
                   <p className="text-xs text-amber-600 flex items-center gap-1 mt-1">
                     <Clock className="w-3 h-3" /> Update pending confirmation: {p.pendingStockRequest.previousStock} → {p.pendingStockRequest.requestedStock}

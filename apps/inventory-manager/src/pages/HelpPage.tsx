@@ -135,6 +135,14 @@ const supplierTerms: Term[] = [
     term: 'Database Backup',
     explanation: 'On the Reports page, "Download Backup" saves a complete copy of everything in the app — every product, sale, expense, supplier, and login — as one file. Keep a copy somewhere safe every so often; if anything ever goes wrong, this file can restore everything exactly as it was.',
   },
+  {
+    term: 'Activity Log',
+    explanation: 'A running record of who did what — every product, sale, expense, and supplier change, tagged with the admin or supplier login that made it. Useful for catching a mistake or just knowing what happened while you were away.',
+  },
+  {
+    term: 'Days-left estimate',
+    explanation: 'On a low-stock item, this is a rough estimate of how many days of stock remain, based on how fast it has sold over the last 30 days. It\'s a guide, not a guarantee — sales pace can change.',
+  },
 ];
 
 export default function HelpPage() {

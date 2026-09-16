@@ -58,6 +58,7 @@ export const exportPdf = (input: any) => call('exportPdf', input);
 export const printReceipt = (input: any) => call('printReceipt', input);
 export const downloadBackup = () => call('admin/downloadBackup', {});
 export const resetAllData = (input: any) => call('admin/resetAllData', input);
+export const getActivityLog = () => call('admin/getActivityLog', {});
 
 // ---- Auth / user management ----
 export const changePassword = (input: any) => call('auth/changePassword', input);
@@ -91,7 +92,7 @@ export const api = {
   getExpenses, saveExpense, deleteExpense,
   getSuppliers, saveSupplier, deleteSupplier,
   getLookups, saveLookup, deleteLookup, bulkImportProducts,
-  getDashboard, getProfitLoss, exportPdf, printReceipt, downloadBackup, resetAllData,
+  getDashboard, getProfitLoss, exportPdf, printReceipt, downloadBackup, resetAllData, getActivityLog,
   changePassword, getUsers, createSupplierLogin, resetPassword, setUserStatus,
   getSupplierSummary, saveSupplierProduct, addSupplierCategory, bulkImportSupplierProducts,
   getNotifications, markNotificationsRead, confirmStockUpdate, rejectStockUpdate,

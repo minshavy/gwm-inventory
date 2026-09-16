@@ -124,6 +124,14 @@ function init() {
       recordedBy TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS "ActivityLog" (
+      id TEXT PRIMARY KEY,
+      actorUsername TEXT,
+      actorRole TEXT,
+      message TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   // Migration: notifications about a stock request carry the request id so

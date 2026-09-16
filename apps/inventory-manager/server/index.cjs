@@ -35,6 +35,18 @@ function productSupplierId(productId) {
   return row ? row.suppliersId : null;
 }
 
+// Records one line in the activity log — a lightweight audit trail so an
+// admin with multiple supplier logins touching the same data can see who
+// did what. Never let a logging failure break the actual request.
+function logActivity(actorUsername, actorRole, message) {
+  try {
+    db.prepare(`INSERT INTO "ActivityLog" (id, actorUsername, actorRole, message) VALUES (?,?,?,?)`)
+      .run(uuid(), actorUsername || 'unknown', actorRole || 'unknown', message);
+  } catch (e) {
+    console.error('Failed to log activity:', e);
+  }
+}
+
 // Total profit (unbounded — no LIMIT) from sales of a supplier's own
 // products, and their 1/3 share of it. Used by both the supplier's own
 // earnings view and the admin payout ledger, so the two always agree.
@@ -129,6 +141,8 @@ app.post('/api/admin/confirmStockUpdate', requireAdmin, (req, res) => {
 
   db.prepare(`UPDATE "StockUpdateRequests" SET status='confirmed' WHERE id=?`).run(requestId);
   db.prepare(`DELETE FROM "Notifications" WHERE requestId=?`).run(requestId);
+  const product = db.prepare(`SELECT name FROM "Products" WHERE id=?`).get(request.productId);
+  logActivity(req.user.username, 'admin', `Confirmed a supplier stock update for "${product?.name || 'Unknown'}" (${request.previousStock} → ${request.requestedStock})`);
   res.json({ success: true });
 });
 
@@ -139,6 +153,8 @@ app.post('/api/admin/rejectStockUpdate', requireAdmin, (req, res) => {
   if (request.status !== 'pending') return res.status(400).json({ error: 'This request was already handled' });
   db.prepare(`UPDATE "StockUpdateRequests" SET status='rejected' WHERE id=?`).run(requestId);
   db.prepare(`DELETE FROM "Notifications" WHERE requestId=?`).run(requestId);
+  const product = db.prepare(`SELECT name FROM "Products" WHERE id=?`).get(request.productId);
+  logActivity(req.user.username, 'admin', `Rejected a supplier stock update for "${product?.name || 'Unknown'}"`);
   res.json({ success: true });
 });
 
@@ -189,19 +205,26 @@ app.post('/api/admin/getSupplierPayouts', requireAdmin, (req, res) => {
 
 app.post('/api/admin/recordPayout', requireAdmin, (req, res) => {
   const { supplierId, amount, date, notes } = req.body || {};
-  const supplier = db.prepare(`SELECT id FROM "Suppliers" WHERE id = ?`).get(supplierId);
+  const supplier = db.prepare(`SELECT id, name FROM "Suppliers" WHERE id = ?`).get(supplierId);
   if (!supplier) return res.status(400).json({ error: 'Supplier not found' });
   if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'Enter an amount greater than 0' });
   const id = uuid();
   db.prepare(`
     INSERT INTO "SupplierPayouts" (id, supplierId, amount, date, notes, recordedBy) VALUES (?,?,?,?,?,?)
   `).run(id, supplierId, Number(amount), date || new Date().toISOString().slice(0, 10), notes ?? null, req.user.username);
+  logActivity(req.user.username, 'admin', `Recorded a payout of MVR ${Number(amount).toFixed(2)} to supplier "${supplier.name}"`);
   res.json({ success: true, id });
 });
 
 app.post('/api/admin/deletePayout', requireAdmin, (req, res) => {
   const { id } = req.body || {};
+  const existing = db.prepare(`
+    SELECT sp.amount, s.name AS supplierName FROM "SupplierPayouts" sp
+    LEFT JOIN "Suppliers" s ON s.id = sp.supplierId
+    WHERE sp.id = ?
+  `).get(id);
   db.prepare(`DELETE FROM "SupplierPayouts" WHERE id = ?`).run(id);
+  logActivity(req.user.username, 'admin', `Removed a payout record for supplier "${existing?.supplierName || 'Unknown'}"`);
   res.json({ success: true });
 });
 
@@ -230,6 +253,7 @@ app.post('/api/admin/createSupplierLogin', requireAdmin, (req, res) => {
   db.prepare(`
     INSERT INTO "Users" (id, username, passwordHash, role, supplierId, status) VALUES (?,?,?,?,?,?)
   `).run(id, String(username).trim(), hashPassword(password), 'supplier', supplierId, 'Active');
+  logActivity(req.user.username, 'admin', `Created a login for supplier "${supplier.name}"`);
   res.json({ success: true, id });
 });
 
@@ -285,6 +309,19 @@ app.post('/api/supplier/summary', requireSupplier, (req, res) => {
   `).all(supplierId);
   const pendingByProduct = Object.fromEntries(pendingRequests.map(r => [r.productId, r]));
 
+  // Recent sales speed (last 30 days) for this supplier's own products, to
+  // estimate days-of-stock-left on low/out-of-stock items.
+  const velocityRows = db.prepare(`
+    SELECT p.id AS productId, COALESCE(SUM(s.quantity), 0) AS soldQty
+    FROM "Products" p
+    JOIN "ProductsSuppliers" ps ON ps.productsId = p.id
+    JOIN "ProductsSales" pl ON pl.productsId = p.id
+    JOIN "Sales" s ON s.id = pl.salesId
+    WHERE ps.suppliersId = ? AND s.date >= date('now', '-29 days')
+    GROUP BY p.id
+  `).all(supplierId);
+  const dailyRateByProduct = Object.fromEntries(velocityRows.map(r => [r.productId, r.soldQty / 30]));
+
   const earnings = getSupplierEarnings(supplierId);
 
   res.json({
@@ -296,6 +333,9 @@ app.post('/api/supplier/summary', requireSupplier, (req, res) => {
       status: p.status || 'Active',
       stockFlag: (p.currentStock ?? 0) <= 0 ? 'Out of Stock'
         : (p.currentStock ?? 0) <= (p.lowStockThreshold ?? 10) ? 'Low Stock' : 'OK',
+      daysLeft: (dailyRateByProduct[p.id] || 0) > 0
+        ? Math.max(0, Math.round((p.currentStock ?? 0) / dailyRateByProduct[p.id]))
+        : null,
       pendingStockRequest: pendingByProduct[p.id]
         ? { previousStock: pendingByProduct[p.id].previousStock, requestedStock: pendingByProduct[p.id].requestedStock }
         : null,
@@ -343,6 +383,7 @@ app.post('/api/supplier/saveProduct', requireSupplier, (req, res) => {
     if (!needsConfirmation) {
       db.prepare(`UPDATE "Products" SET status=? WHERE id=?`)
         .run(newStockRequested <= 0 ? 'Out of Stock' : 'Active', b.id);
+      logActivity(req.user.username, 'supplier', `Edited product "${b.name}"`);
       return res.json({ success: true, id: b.id, pendingStockUpdate: false });
     }
 
@@ -359,6 +400,7 @@ app.post('/api/supplier/saveProduct', requireSupplier, (req, res) => {
       b.id, reqId
     );
 
+    logActivity(req.user.username, 'supplier', `Requested a stock update for "${existing?.name || b.name}" (${oldStock} → ${newStockRequested}, pending admin confirmation)`);
     return res.json({ success: true, id: b.id, pendingStockUpdate: true });
   }
 
@@ -391,6 +433,7 @@ app.post('/api/supplier/saveProduct', requireSupplier, (req, res) => {
     id
   );
 
+  logActivity(req.user.username, 'supplier', `Added product "${b.name}"`);
   res.json({ success: true, id });
 });
 
@@ -463,6 +506,7 @@ app.post('/api/supplier/bulkImportProducts', requireSupplier, (req, res) => {
       `${supplier?.name || 'A supplier'} bulk-added ${results.inserted} new product${results.inserted === 1 ? '' : 's'} via CSV import — set selling prices to activate them.`,
       null
     );
+    logActivity(req.user.username, 'supplier', `Bulk imported ${results.inserted} product${results.inserted === 1 ? '' : 's'} via CSV`);
   }
 
   res.json({ success: true, ...results });
@@ -528,6 +572,7 @@ app.post('/api/saveProduct', requireAdmin, (req, res) => {
     if (b.sellingPrice) {
       db.prepare(`DELETE FROM "Notifications" WHERE productId = ?`).run(b.id);
     }
+    logActivity(req.user.username, 'admin', `Edited product "${b.name}"`);
     return res.json({ success: true, id: b.id });
   }
   const id = uuid();
@@ -540,6 +585,7 @@ app.post('/api/saveProduct', requireAdmin, (req, res) => {
     b.currentStock ?? 0, b.lowStockThreshold ?? 20, b.status ?? 'Active'
   );
   if (b.supplierId) db.prepare(`INSERT INTO "ProductsSuppliers" (productsId, suppliersId) VALUES (?,?)`).run(id, b.supplierId);
+  logActivity(req.user.username, 'admin', `Added product "${b.name}"`);
   res.json({ success: true, id });
 });
 
@@ -547,10 +593,12 @@ app.post('/api/deleteProduct', requireAdmin, (req, res) => {
   const { id } = req.body || {};
   const hasSales = db.prepare(`SELECT COUNT(*) AS c FROM "ProductsSales" WHERE productsId = ?`).get(id).c;
   if (hasSales > 0) return res.status(400).json({ error: "Can't delete a product that already has recorded sales." });
+  const existing = db.prepare(`SELECT name FROM "Products" WHERE id=?`).get(id);
   db.prepare(`DELETE FROM "ProductsSuppliers" WHERE productsId=?`).run(id);
   db.prepare(`DELETE FROM "ProductsStockMovements" WHERE productsId=?`).run(id);
   db.prepare(`DELETE FROM "Notifications" WHERE productId=?`).run(id);
   db.prepare(`DELETE FROM "Products" WHERE id=?`).run(id);
+  logActivity(req.user.username, 'admin', `Deleted product "${existing?.name || id}"`);
   res.json({ success: true });
 });
 
@@ -601,6 +649,7 @@ app.post('/api/bulkImportProducts', requireAdmin, (req, res) => {
     results.inserted++;
   });
 
+  if (results.inserted > 0) logActivity(req.user.username, 'admin', `Bulk imported ${results.inserted} product${results.inserted === 1 ? '' : 's'} via CSV`);
   res.json({ success: true, ...results });
 });
 
@@ -667,6 +716,7 @@ app.post('/api/recordStockMovement', requireAdmin, (req, res) => {
   db.prepare(`UPDATE "Products" SET currentStock=?, status=? WHERE id=?`)
     .run(newStock, newStock <= 0 ? 'Out of Stock' : 'Active', b.productId);
 
+  logActivity(req.user.username, 'admin', `Recorded ${b.type.toLowerCase()} of ${b.quantity} for "${product.name}"`);
   res.json({ success: true, newStock });
 });
 
@@ -753,11 +803,19 @@ app.post('/api/recordSale', requireAdmin, (req, res) => {
     .run(moveId, ref, 'Stock Out', qty, `Sale #${saleId}`, req.user.username);
   db.prepare(`INSERT INTO "ProductsStockMovements" (productsId, stockMovementsId) VALUES (?,?)`).run(b.productId, moveId);
 
+  logActivity(req.user.username, 'admin', `Recorded a sale of ${qty} × "${product.name}"`);
   res.json({ success: true, id, profit });
 });
 
 app.post('/api/deleteSale', requireAdmin, (req, res) => {
+  const existing = db.prepare(`
+    SELECT s.saleId, p.name AS productName FROM "Sales" s
+    LEFT JOIN "ProductsSales" pl ON pl.salesId = s.id
+    LEFT JOIN "Products" p ON p.id = pl.productsId
+    WHERE s.id = ?
+  `).get(req.body.id);
   db.prepare(`DELETE FROM "Sales" WHERE id=?`).run(req.body.id);
+  logActivity(req.user.username, 'admin', `Deleted a sale of "${existing?.productName || 'Unknown'}"`);
   res.json({ success: true });
 });
 
@@ -812,6 +870,7 @@ app.post('/api/saveExpense', requireAdmin, (req, res) => {
     db.prepare(`DELETE FROM "ExpensesPaymentMethods" WHERE expensesId=?`).run(b.id);
     if (b.categoryId) db.prepare(`INSERT INTO "ExpenseCategoriesExpenses" (expenseCategoriesId, expensesId) VALUES (?,?)`).run(b.categoryId, b.id);
     if (b.paymentMethodId) db.prepare(`INSERT INTO "ExpensesPaymentMethods" (expensesId, paymentMethodsId) VALUES (?,?)`).run(b.id, b.paymentMethodId);
+    logActivity(req.user.username, 'admin', `Edited expense "${b.description}"`);
     return res.json({ success: true, id: b.id });
   }
   const id = uuid();
@@ -820,11 +879,14 @@ app.post('/api/saveExpense', requireAdmin, (req, res) => {
     .run(id, expenseId, b.date, b.description, b.amount, b.notes ?? null, req.user.username);
   if (b.categoryId) db.prepare(`INSERT INTO "ExpenseCategoriesExpenses" (expenseCategoriesId, expensesId) VALUES (?,?)`).run(b.categoryId, id);
   if (b.paymentMethodId) db.prepare(`INSERT INTO "ExpensesPaymentMethods" (expensesId, paymentMethodsId) VALUES (?,?)`).run(id, b.paymentMethodId);
+  logActivity(req.user.username, 'admin', `Added expense "${b.description}"`);
   res.json({ success: true, id });
 });
 
 app.post('/api/deleteExpense', requireAdmin, (req, res) => {
+  const existing = db.prepare(`SELECT description FROM "Expenses" WHERE id=?`).get(req.body.id);
   db.prepare(`DELETE FROM "Expenses" WHERE id=?`).run(req.body.id);
+  logActivity(req.user.username, 'admin', `Deleted expense "${existing?.description || req.body.id}"`);
   res.json({ success: true });
 });
 
@@ -860,16 +922,20 @@ app.post('/api/saveSupplier', requireAdmin, (req, res) => {
   if (b.id) {
     db.prepare(`UPDATE "Suppliers" SET name=?, phone=?, email=?, address=?, notes=?, status=? WHERE id=?`)
       .run(b.name, b.phone ?? null, b.email ?? null, b.address ?? null, b.notes ?? null, b.status ?? 'Active', b.id);
+    logActivity(req.user.username, 'admin', `Edited supplier "${b.name}"`);
     return res.json({ success: true, id: b.id });
   }
   const id = uuid();
   db.prepare(`INSERT INTO "Suppliers" (id, name, phone, email, address, notes, status) VALUES (?,?,?,?,?,?,?)`)
     .run(id, b.name, b.phone ?? null, b.email ?? null, b.address ?? null, b.notes ?? null, b.status ?? 'Active');
+  logActivity(req.user.username, 'admin', `Added supplier "${b.name}"`);
   res.json({ success: true, id });
 });
 
 app.post('/api/deleteSupplier', requireAdmin, (req, res) => {
+  const existing = db.prepare(`SELECT name FROM "Suppliers" WHERE id=?`).get(req.body.id);
   db.prepare(`DELETE FROM "Suppliers" WHERE id=?`).run(req.body.id);
+  logActivity(req.user.username, 'admin', `Deleted supplier "${existing?.name || req.body.id}"`);
   res.json({ success: true });
 });
 
@@ -966,6 +1032,18 @@ app.post('/api/getDashboard', requireAdmin, (req, res) => {
     ORDER BY currentStock ASC LIMIT 30
   `).all();
 
+  // Recent sales speed (last 30 days) per product, used to estimate how many
+  // days of stock are left for each low/out-of-stock item.
+  const velocityRows = db.prepare(`
+    SELECT p.id AS productId, COALESCE(SUM(s.quantity), 0) AS soldQty
+    FROM "Products" p
+    JOIN "ProductsSales" pl ON pl.productsId = p.id
+    JOIN "Sales" s ON s.id = pl.salesId
+    WHERE s.date >= date('now', '-29 days')
+    GROUP BY p.id
+  `).all();
+  const dailyRateByProduct = Object.fromEntries(velocityRows.map(r => [r.productId, r.soldQty / 30]));
+
   const salesByDateRows = db.prepare(`
     SELECT strftime('%Y-%m-%d', date) AS date, COALESCE(SUM(revenue),0) AS revenue, COALESCE(SUM(profit),0) AS profit
     FROM "Sales"
@@ -1032,11 +1110,17 @@ app.post('/api/getDashboard', requireAdmin, (req, res) => {
       id: r.id, name: r.name, currentStock: r.currentStock ?? 0,
       lowStockThreshold: r.lowStockThreshold ?? 20, category: r.category || null,
     })),
-    stockAlerts: stockAlertRows.map(r => ({
-      id: r.id, name: r.name, currentStock: r.currentStock ?? 0,
-      lowStockThreshold: r.lowStockThreshold ?? 20, category: r.category || null,
-      stockFlag: (r.currentStock ?? 0) <= 0 ? 'Out of Stock' : 'Low Stock',
-    })),
+    stockAlerts: stockAlertRows.map(r => {
+      const dailyRate = dailyRateByProduct[r.id] || 0;
+      const currentStock = r.currentStock ?? 0;
+      const daysLeft = dailyRate > 0 ? Math.max(0, Math.round(currentStock / dailyRate)) : null;
+      return {
+        id: r.id, name: r.name, currentStock,
+        lowStockThreshold: r.lowStockThreshold ?? 20, category: r.category || null,
+        stockFlag: currentStock <= 0 ? 'Out of Stock' : 'Low Stock',
+        daysLeft,
+      };
+    }),
     salesOverTime: salesOverTime.map(r => ({ date: r.date, revenue: r.revenue, profit: r.profit })),
     expensesByCategory: expensesByCategory.map(r => ({ category: r.category, amount: r.amount })),
     topProducts: topProducts.map(r => ({ name: r.name, revenue: r.revenue, quantity: r.quantity })),
@@ -1158,7 +1242,13 @@ app.post('/api/admin/resetAllData', requireAdmin, (req, res) => {
   });
   wipe();
 
+  logActivity(req.user.username, 'admin', 'Reset all data — every product, sale, expense, and supplier was permanently deleted.');
   res.json({ success: true });
+});
+
+app.post('/api/admin/getActivityLog', requireAdmin, (req, res) => {
+  const rows = db.prepare(`SELECT * FROM "ActivityLog" ORDER BY created_at DESC LIMIT 200`).all();
+  res.json({ entries: rows });
 });
 
 let puppeteerBrowserPromise = null;

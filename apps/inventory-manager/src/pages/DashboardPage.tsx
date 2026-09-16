@@ -323,7 +323,14 @@ export default function DashboardPage() {
                 onClick={() => navigate(`/products?edit=${p.id}`)}
                 className="flex items-center justify-between gap-2 p-2 rounded border bg-muted/30 hover:bg-muted/60 transition-colors text-left"
               >
-                <span className="text-sm font-medium truncate">{p.name}</span>
+                <span className="min-w-0">
+                  <span className="text-sm font-medium truncate block">{p.name}</span>
+                  {p.stockFlag === 'Low Stock' && (
+                    <span className="text-xs text-muted-foreground block">
+                      {p.daysLeft === null ? 'No recent sales' : p.daysLeft === 0 ? 'Selling out today' : `~${p.daysLeft} day${p.daysLeft === 1 ? '' : 's'} left`}
+                    </span>
+                  )}
+                </span>
                 <span className="flex items-center gap-2 flex-shrink-0">
                   <span className={`text-sm font-bold ${p.stockFlag === 'Out of Stock' ? 'text-destructive' : 'text-yellow-600'}`}>
                     {p.currentStock} / {p.lowStockThreshold}

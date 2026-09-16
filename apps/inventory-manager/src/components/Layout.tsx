@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, ArrowLeftRight, ShoppingCart,
   Receipt, TrendingUp, BarChart3, Tags, Tag, Truck, CreditCard,
-  Menu, X, ChevronLeft, LogOut, HelpCircle, HandCoins, Sun, Moon,
+  Menu, X, ChevronLeft, LogOut, HelpCircle, HandCoins, Sun, Moon, History,
 } from 'lucide-react';
 import { cn } from '@project/components/lib/utils';
 import { Button } from '@project/components/ui/button';
@@ -26,6 +26,7 @@ const navItems = [
   { to: '/suppliers', label: 'Suppliers', icon: Truck },
   { to: '/payouts', label: 'Payouts', icon: HandCoins },
   { to: '/payment-methods', label: 'Payment Methods', icon: CreditCard },
+  { to: '/activity', label: 'Activity Log', icon: History },
   { to: '/help', label: 'Help & Guide', icon: HelpCircle },
 ];
 
