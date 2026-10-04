@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getSales, recordSale, deleteSale, getLookups, getProducts, printReceipt } from '@/lib/api-client';
+import { getSales, recordSale, deleteSale, getLookups, getProducts, printReceipt, getTopSellingProducts } from '@/lib/api-client';
 import { Button } from '@project/components/ui/button';
 import { Input } from '@project/components/ui/input';
 import { Label } from '@project/components/ui/label';
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@project/components/ui/dialog';
 import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@project/components/ui/alert-dialog';
+import { undoableDelete } from '@/lib/undoable-delete';
 import { Popover, PopoverContent, PopoverTrigger } from '@project/components/ui/popover';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Plus, Search, Trash2, ShoppingCart, ChevronsUpDown, Check, Printer, Loader2 } from 'lucide-react';
@@ -26,7 +26,6 @@ export default function SalesPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
 
   const handlePrintReceipt = async (saleId: string) => {
@@ -43,6 +42,7 @@ export default function SalesPage() {
   const [saving, setSaving] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
 
   // Form state
   const [form, setForm] = useState({
@@ -66,12 +66,14 @@ export default function SalesPage() {
 
   const openDialog = async () => {
     setForm({ productId: '', quantity: 1, sellingPrice: 0, costPrice: 0, discount: 0, paymentMethodId: '', date: new Date().toISOString().slice(0, 10), notes: '' });
-    const [prods, pms] = await Promise.all([
+    const [prods, pms, top] = await Promise.all([
       getProducts({ limit: 500 }),
       getLookups({ type: 'paymentMethods' }),
+      getTopSellingProducts().catch(() => ({ products: [] })),
     ]);
     setProducts(prods.products.filter((p: any) => p.status === 'Active'));
     setPaymentMethods(pms.items.filter((pm: any) => pm.status === 'Active'));
+    setTopProducts(top.products || []);
     setDialogOpen(true);
   };
 
@@ -131,16 +133,15 @@ export default function SalesPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
-    try {
-      await deleteSale({ id: deleteId });
-      toast.success('Sale deleted');
-      setDeleteId(null);
-      load();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to delete');
-    }
+  const handleDelete = (s: any) => {
+    const snapshot = sales;
+    undoableDelete({
+      itemLabel: `Sale of "${s.productName}"`,
+      description: "Stock won't be restored automatically.",
+      onRemoveLocally: () => setSales(prev => prev.filter((x: any) => x.id !== s.id)),
+      onRestoreLocally: () => setSales(snapshot),
+      onConfirmDelete: () => deleteSale({ id: s.id }),
+    });
   };
 
   return (
@@ -191,7 +192,7 @@ export default function SalesPage() {
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handlePrintReceipt(s.id)} disabled={printingId === s.id}>
                     {printingId === s.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 -mr-1" onClick={() => setDeleteId(s.id)}>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 -mr-1" onClick={() => handleDelete(s)}>
                     <Trash2 className="w-3.5 h-3.5 text-destructive" />
                   </Button>
                 </div>
@@ -241,7 +242,7 @@ export default function SalesPage() {
                       <Button variant="ghost" size="icon" onClick={() => handlePrintReceipt(s.id)} disabled={printingId === s.id}>
                         {printingId === s.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteId(s.id)}>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(s)}>
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
                     </td>
@@ -268,6 +269,29 @@ export default function SalesPage() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  {topProducts.length > 0 && !productSearch && (
+                    <div className="p-2 border-b">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground px-1 mb-1.5">Most sold</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {topProducts.map((p: any) => (
+                          <button
+                            key={p.id}
+                            onClick={() => {
+                              onProductChange(p.id);
+                              setProductPopoverOpen(false);
+                              setProductSearch('');
+                            }}
+                            className={cn(
+                              'px-2.5 py-1 rounded-full border text-xs font-medium transition-colors hover:bg-accent',
+                              form.productId === p.id && 'bg-accent border-primary'
+                            )}
+                          >
+                            {p.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="p-2 border-b">
                     <div className="flex items-center gap-2 px-2">
                       <Search className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -365,20 +389,6 @@ export default function SalesPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Delete confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Sale</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently delete this sale record. Stock will not be restored automatically.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

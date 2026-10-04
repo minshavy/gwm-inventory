@@ -11,8 +11,8 @@ import { toast } from 'sonner';
 import { useDebouncedCallback } from 'use-debounce';
 import ProductDialog from '../components/ProductDialog';
 import StockMovementDialog from '../components/StockMovementDialog';
-import DeleteConfirmDialog from '../components/DeleteConfirmDialog';
 import { BulkImportDialog } from '@/components/BulkImportDialog';
+import { undoableDelete } from '@/lib/undoable-delete';
 
 type Product = GetProductsOutputType['products'][0];
 
@@ -27,8 +27,6 @@ export default function ProductsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
   const PAGE_SIZE = 20;
@@ -89,16 +87,14 @@ export default function ProductsPage() {
     getLookups({ type: 'categories' }).then(res => setCategoryOptions(res.items)).catch(() => {});
   };
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await deleteProduct({ id: deleteTarget.id });
-      toast.success(`${deleteTarget.name} deleted`);
-      setDeleteTarget(null);
-      fetchProducts(search, category, page);
-    } catch (e: any) { toast.error(e?.message || 'Failed to delete'); }
-    finally { setDeleting(false); }
+  const handleDelete = (p: Product) => {
+    const snapshot = products;
+    undoableDelete({
+      itemLabel: p.name,
+      onRemoveLocally: () => setProducts(prev => prev.filter(x => x.id !== p.id)),
+      onRestoreLocally: () => setProducts(snapshot),
+      onConfirmDelete: () => deleteProduct({ id: p.id }),
+    });
   };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -203,7 +199,7 @@ export default function ProductsPage() {
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Button size="sm" variant="outline" onClick={() => setStockProduct(p)} className="h-8">Stock</Button>
-                            <Button size="sm" variant="ghost" onClick={() => setDeleteTarget(p)} className="h-8 w-8 p-0"><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                            <Button size="sm" variant="ghost" onClick={() => handleDelete(p)} className="h-8 w-8 p-0"><Trash2 className="w-4 h-4 text-destructive" /></Button>
                           </div>
                         </td>
                       </tr>
@@ -254,15 +250,6 @@ export default function ProductsPage() {
         onClose={() => setStockProduct(null)}
         product={stockProduct as any}
         onSaved={handleSaved}
-      />
-
-      <DeleteConfirmDialog
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        title={`Delete "${deleteTarget?.name}"?`}
-        description="This action cannot be undone. Products that already have recorded sales can't be deleted."
-        onConfirm={handleDelete}
-        loading={deleting}
       />
     </div>
   );

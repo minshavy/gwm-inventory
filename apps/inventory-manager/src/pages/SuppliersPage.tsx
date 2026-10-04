@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@project/compo
 import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { Textarea } from '@project/components/ui/textarea';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@project/components/ui/alert-dialog';
+import { undoableDelete } from '@/lib/undoable-delete';
 import { Plus, Search, Trash2, Pencil, Truck, Phone, Mail, KeyRound, UserPlus, Ban, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -17,7 +17,6 @@ export default function SuppliersPage() {
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [editId, setEditId] = useState<string | undefined>();
 
@@ -76,16 +75,14 @@ export default function SuppliersPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
-    try {
-      await deleteSupplier({ id: deleteId });
-      toast.success('Supplier deleted');
-      setDeleteId(null);
-      load();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed');
-    }
+  const handleDelete = (s: any) => {
+    const snapshot = suppliers;
+    undoableDelete({
+      itemLabel: s.name,
+      onRemoveLocally: () => setSuppliers(prev => prev.filter((x: any) => x.id !== s.id)),
+      onRestoreLocally: () => setSuppliers(snapshot),
+      onConfirmDelete: () => deleteSupplier({ id: s.id }),
+    });
   };
 
   const openLoginDialog = (supplier: any) => {
@@ -169,7 +166,7 @@ export default function SuppliersPage() {
                 </div>
                 <div className="flex gap-1">
                   <Button variant="ghost" size="icon" onClick={() => openDialog(s)}><Pencil className="w-4 h-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={() => setDeleteId(s.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                  <Button variant="ghost" size="icon" onClick={() => handleDelete(s)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                 </div>
               </div>
               {s.phone && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Phone className="w-3.5 h-3.5" />{s.phone}</div>}
@@ -245,19 +242,6 @@ export default function SuppliersPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Supplier</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently delete this supplier.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

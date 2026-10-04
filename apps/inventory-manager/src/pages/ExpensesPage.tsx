@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@project/compo
 import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@project/components/ui/alert-dialog';
+import { undoableDelete } from '@/lib/undoable-delete';
 import { Plus, Search, Trash2, Pencil, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 import NumericInput from '../components/NumericInput';
@@ -24,7 +24,6 @@ export default function ExpensesPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [categories, setCategories] = useState<any[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
@@ -103,16 +102,14 @@ export default function ExpensesPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!deleteId) return;
-    try {
-      await deleteExpense({ id: deleteId });
-      toast.success('Expense deleted');
-      setDeleteId(null);
-      load();
-    } catch (e: any) {
-      toast.error(e.message || 'Failed to delete');
-    }
+  const handleDelete = (ex: any) => {
+    const snapshot = expenses;
+    undoableDelete({
+      itemLabel: ex.description || 'Expense',
+      onRemoveLocally: () => setExpenses(prev => prev.filter((x: any) => x.id !== ex.id)),
+      onRestoreLocally: () => setExpenses(snapshot),
+      onConfirmDelete: () => deleteExpense({ id: ex.id }),
+    });
   };
 
   return (
@@ -150,7 +147,7 @@ export default function ExpensesPage() {
                   <span className="font-medium text-sm truncate flex-1">{ex.description}</span>
                   <div className="flex gap-0.5 ml-1">
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openDialog(ex)}><Pencil className="w-3.5 h-3.5" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDeleteId(ex.id)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(ex)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-sm">
@@ -190,7 +187,7 @@ export default function ExpensesPage() {
                     <td className="px-4 py-3">{ex.paymentMethod && <Badge variant="outline">{ex.paymentMethod}</Badge>}</td>
                     <td className="px-4 py-3 text-right flex gap-1 justify-end">
                       <Button variant="ghost" size="icon" onClick={() => openDialog(ex)}><Pencil className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteId(ex.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => handleDelete(ex)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
                     </td>
                   </tr>
                 ))}
@@ -234,19 +231,6 @@ export default function ExpensesPage() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={!!deleteId} onOpenChange={open => !open && setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Expense</AlertDialogTitle>
-            <AlertDialogDescription>This will permanently delete this expense record.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

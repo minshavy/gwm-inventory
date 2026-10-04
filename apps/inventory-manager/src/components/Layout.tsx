@@ -3,15 +3,17 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Package, ArrowLeftRight, ShoppingCart,
   Receipt, TrendingUp, BarChart3, Tags, Tag, Truck, CreditCard,
-  Menu, X, ChevronLeft, LogOut, HelpCircle, HandCoins, Sun, Moon, History,
+  Menu, X, ChevronLeft, LogOut, HelpCircle, HandCoins, Sun, Moon, History, Search,
 } from 'lucide-react';
 import { cn } from '@project/components/lib/utils';
 import { Button } from '@project/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@project/components/ui/dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth-shim';
 import { useTheme } from '@/lib/theme-provider';
 import { getNotifications } from '@/lib/api-client';
 import { BackToTopButton } from '@/components/BackToTopButton';
+import { GlobalSearch } from '@/components/GlobalSearch';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -41,6 +43,9 @@ function SidebarContent({ onNavigate, badges = {} }: { onNavigate?: () => void; 
         <Package className="w-5 h-5 text-primary flex-shrink-0" />
         <span className="text-base font-semibold tracking-tight">GWM Inventory</span>
       </button>
+      <div className="px-2 pt-2">
+        <GlobalSearch />
+      </div>
       <nav className="flex-1 overflow-y-auto py-2 px-2" onWheel={(e) => { e.currentTarget.scrollTop += e.deltaY; }}
         onTouchStart={(e) => { (e.currentTarget as any)._touchY = e.touches[0].clientY; }}
         onTouchMove={(e) => {
@@ -81,6 +86,7 @@ function SidebarContent({ onNavigate, badges = {} }: { onNavigate?: () => void; 
 
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [badges, setBadges] = useState<Record<string, number>>({});
   const location = useLocation();
@@ -186,6 +192,9 @@ export default function Layout() {
           <span className="font-semibold text-sm truncate">GWM Inventory</span>
         </button>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <Button variant="ghost" size="icon" onClick={() => setMobileSearchOpen(true)}>
+            <Search className="w-5 h-5" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={toggleTheme}>
             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </Button>
@@ -197,6 +206,14 @@ export default function Layout() {
           </Button>
         </div>
       </header>
+
+      {/* Mobile search dialog */}
+      <Dialog open={mobileSearchOpen} onOpenChange={setMobileSearchOpen}>
+        <DialogContent className="max-w-md top-24 translate-y-0">
+          <DialogHeader><DialogTitle>Search</DialogTitle></DialogHeader>
+          <GlobalSearch autoFocus onNavigate={() => setMobileSearchOpen(false)} />
+        </DialogContent>
+      </Dialog>
 
       {/* Mobile slide-in */}
       <AnimatePresence>

@@ -29,6 +29,8 @@ async function call<TIn, TOut>(name: string, input: TIn): Promise<TOut> {
 }
 
 export const getProducts = (input: any) => call('getProducts', input);
+export const globalSearch = (input: any) => call('globalSearch', input);
+export const getTopSellingProducts = () => call('getTopSellingProducts', {});
 export const saveProduct = (input: any) => call('saveProduct', input);
 export const deleteProduct = (input: any) => call('deleteProduct', input);
 
@@ -86,7 +88,7 @@ export const recordPayout = (input: any) => call('admin/recordPayout', input);
 export const deletePayout = (input: any) => call('admin/deletePayout', input);
 
 export const api = {
-  getProducts, saveProduct, deleteProduct,
+  getProducts, saveProduct, deleteProduct, globalSearch, getTopSellingProducts,
   getMovements, recordStockMovement,
   getSales, recordSale, deleteSale,
   getExpenses, saveExpense, deleteExpense,

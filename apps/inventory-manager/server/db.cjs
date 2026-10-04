@@ -1,12 +1,40 @@
-// Database setup: schema creation + seed data, backed by a local SQLite file.
+// Database setup: schema creation + seed data.
+//
+// Uses libsql (a better-sqlite3-compatible SQLite library). Two modes:
+//
+//   1. Local file (default) — same as before, data lives in server/data.db.
+//      Fine for running on your own computer.
+//
+//   2. Turso (when TURSO_DATABASE_URL is set) — the local file becomes an
+//      "embedded replica": a fast local copy that syncs with your Turso cloud
+//      database. Writes go to Turso, so data survives restarts and redeploys
+//      even on free hosting with no persistent disk.
 
-const Database = require('better-sqlite3');
+const Database = require('libsql');
 const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 
-const db = new Database(process.env.DB_PATH || path.join(__dirname, 'data.db'));
-db.pragma('journal_mode = WAL');
+const DB_FILE = process.env.DB_PATH || path.join(__dirname, 'data.db');
+const TURSO_URL = process.env.TURSO_DATABASE_URL;
+const TURSO_TOKEN = process.env.TURSO_AUTH_TOKEN;
+
+let db;
+if (TURSO_URL) {
+  db = new Database(DB_FILE, {
+    syncUrl: TURSO_URL,
+    authToken: TURSO_TOKEN,
+    // Pull changes from Turso every 60s as a safety net.
+    syncPeriod: 60,
+  });
+  // Pull the latest data from Turso before anything reads it.
+  db.sync();
+  console.log('Database: Turso (embedded replica synced from cloud)');
+} else {
+  db = new Database(DB_FILE);
+  db.pragma('journal_mode = WAL');
+  console.log(`Database: local file (${DB_FILE})`);
+}
 
 function uuid() {
   return crypto.randomUUID();
@@ -185,4 +213,4 @@ function init() {
 
 init();
 
-module.exports = { db, uuid };
+module.exports = { db, uuid, DB_FILE, USING_TURSO: !!TURSO_URL };

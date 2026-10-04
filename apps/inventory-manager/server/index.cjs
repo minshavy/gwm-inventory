@@ -5,7 +5,7 @@
 
 const express = require('express');
 const cors = require('cors');
-const { db, uuid } = require('./db.cjs');
+const { db, uuid, DB_FILE, USING_TURSO } = require('./db.cjs');
 const {
   hashPassword, comparePassword, signToken,
   authenticate, requireAdmin, requireSupplier, JWT_SECRET,
@@ -18,7 +18,7 @@ app.use(express.json());
 if (JWT_SECRET === 'dev-only-insecure-secret-change-me') {
   console.warn(
     'WARNING: JWT_SECRET is not set — using an insecure built-in default. ' +
-    'Set a real JWT_SECRET env var (e.g. in Railway variables) before this app is reachable publicly, ' +
+    'Set a real JWT_SECRET env var (in your hosting environment variables) before this app is reachable publicly, ' +
     'or every login token can be forged.'
   );
 }
@@ -519,6 +519,60 @@ app.post('/api/supplier/deleteProduct', requireSupplier, (req, res) => {
 });
 
 // ---------- Products (admin only — suppliers use /api/supplier/*) ----------
+// Searches products, suppliers, expenses, and sales (by product name) all
+// at once — powers the header search box so you don't have to hunt through
+// pages one at a time.
+app.post('/api/globalSearch', requireAdmin, (req, res) => {
+  const q = String((req.body || {}).query || '').trim().toLowerCase();
+  if (q.length < 2) return res.json({ products: [], suppliers: [], expenses: [], sales: [] });
+  const like = `%${q}%`;
+
+  const products = db.prepare(`
+    SELECT id, name, sku, sellingPrice, currentStock FROM "Products"
+    WHERE LOWER(name) LIKE ? OR LOWER(sku) LIKE ? OR LOWER(brand) LIKE ?
+    ORDER BY name ASC LIMIT 5
+  `).all(like, like, like);
+
+  const suppliers = db.prepare(`
+    SELECT id, name, phone, email FROM "Suppliers"
+    WHERE LOWER(name) LIKE ? OR LOWER(phone) LIKE ? OR LOWER(email) LIKE ?
+    ORDER BY name ASC LIMIT 5
+  `).all(like, like, like);
+
+  const expenses = db.prepare(`
+    SELECT id, description, amount, date FROM "Expenses"
+    WHERE LOWER(description) LIKE ?
+    ORDER BY date DESC LIMIT 5
+  `).all(like);
+
+  const sales = db.prepare(`
+    SELECT s.id, s.saleId, s.date, s.revenue, p.name AS productName
+    FROM "Sales" s
+    LEFT JOIN "ProductsSales" pl ON pl.salesId = s.id
+    LEFT JOIN "Products" p ON p.id = pl.productsId
+    WHERE LOWER(p.name) LIKE ?
+    ORDER BY s.date DESC LIMIT 5
+  `).all(like);
+
+  res.json({ products, suppliers, expenses, sales });
+});
+
+// Powers the "Quick pick" row in Record Sale — your most-sold products
+// (last 90 days) surfaced first instead of having to search for them.
+app.post('/api/getTopSellingProducts', requireAdmin, (req, res) => {
+  const rows = db.prepare(`
+    SELECT p.id, p.name, p.sku, p.sellingPrice, p.costPrice, p.currentStock, SUM(s.quantity) AS soldQty
+    FROM "Products" p
+    JOIN "ProductsSales" pl ON pl.productsId = p.id
+    JOIN "Sales" s ON s.id = pl.salesId
+    WHERE s.date >= date('now', '-89 days') AND p.status != 'Discontinued'
+    GROUP BY p.id
+    ORDER BY soldQty DESC
+    LIMIT 8
+  `).all();
+  res.json({ products: rows });
+});
+
 app.post('/api/getProducts', requireAdmin, (req, res) => {
   const { search, category, status, id, offset = 0, limit = 50 } = req.body || {};
   let where = [];
@@ -1198,6 +1252,21 @@ const EXPORTS_DIR = pathMod.join(__dirname, 'exports');
 if (!fsSync.existsSync(EXPORTS_DIR)) fsSync.mkdirSync(EXPORTS_DIR, { recursive: true });
 app.use('/exports', express.static(EXPORTS_DIR));
 
+// Generated files (PDFs, DB backups) are only meant to be downloaded right
+// after they're created. Sweep anything older than 15 minutes so sensitive
+// exports — especially full database backups — don't sit in a public folder.
+const EXPORT_TTL_MS = 15 * 60 * 1000;
+function sweepExports() {
+  try {
+    for (const f of fsSync.readdirSync(EXPORTS_DIR)) {
+      const fp = pathMod.join(EXPORTS_DIR, f);
+      if (Date.now() - fsSync.statSync(fp).mtimeMs > EXPORT_TTL_MS) fsSync.unlinkSync(fp);
+    }
+  } catch (e) { /* best-effort cleanup */ }
+}
+sweepExports();
+setInterval(sweepExports, 5 * 60 * 1000).unref();
+
 // ---------- Database backup ----------
 // A raw copy of the live SQLite file — the most direct "undo everything
 // going wrong" insurance. Restoring is just replacing data.db with this file.
@@ -1205,15 +1274,18 @@ app.post('/api/admin/downloadBackup', requireAdmin, (req, res) => {
   try {
     // Flush any pending WAL-mode writes into the main file first, so the
     // copy is complete and self-contained rather than missing recent writes.
-    db.pragma('wal_checkpoint(TRUNCATE)');
+    if (USING_TURSO) db.sync(); else db.pragma('wal_checkpoint(TRUNCATE)');
   } catch (e) {
     // Best-effort — still proceed with whatever is safely on disk.
   }
   try {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
     const filename = `gwm-inventory-backup-${stamp}.db`;
-    fsSync.copyFileSync(db.name, pathMod.join(EXPORTS_DIR, filename));
-    res.json({ url: `/exports/${filename}`, filename });
+    // Random, unguessable path segment — the file sits in a public folder,
+    // so the timestamp alone must never be enough to fetch it.
+    const storedName = `${uuid()}-${filename}`;
+    fsSync.copyFileSync(DB_FILE, pathMod.join(EXPORTS_DIR, storedName));
+    res.json({ url: `/exports/${storedName}`, filename });
   } catch (e) {
     res.status(500).json({ error: 'Failed to create backup file' });
   }
