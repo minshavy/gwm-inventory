@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getSales, recordSale, deleteSale, getLookups, getProducts, printReceipt, getTopSellingProducts } from '@/lib/api-client';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { getSales, recordSale, deleteSale, getLookups, getProducts, printReceipt, getTopSellingProducts, findProductByCode } from '@/lib/api-client';
+import { BarcodeScannerDialog, ScanButton } from '@/components/BarcodeScanner';
 import { Button } from '@project/components/ui/button';
 import { Input } from '@project/components/ui/input';
 import { Label } from '@project/components/ui/label';
@@ -10,7 +11,7 @@ import { Skeleton } from '@project/components/ui/skeleton';
 import { undoableDelete } from '@/lib/undoable-delete';
 import { Popover, PopoverContent, PopoverTrigger } from '@project/components/ui/popover';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
-import { Plus, Search, Trash2, ShoppingCart, ChevronsUpDown, Check, Printer, Loader2 } from 'lucide-react';
+import { Plus, Search, Trash2, ShoppingCart, ChevronsUpDown, Check, Printer, Loader2, ScanBarcode } from 'lucide-react';
 import { cn } from '@project/components/lib/utils';
 import { toast } from 'sonner';
 import NumericInput from '../components/NumericInput';
@@ -64,7 +65,38 @@ export default function SalesPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const openDialog = async () => {
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const formRef = useRef(form);
+  formRef.current = form;
+
+  // Scanning a product picks it and fills its prices. Scanning the same
+  // product again adds 1 to the quantity, so 3 beeps = 3 units.
+  const handleScan = async (code: string) => {
+    try {
+      const { product } = await findProductByCode({ code });
+      if (!product) {
+        toast.error(`No product has barcode or SKU "${code}"`, {
+          description: 'Open Products, edit the item, and save this code in its Barcode field.',
+        });
+        return;
+      }
+      if (product.status !== 'Active') {
+        toast.error(`"${product.name}" is ${product.status.toLowerCase()} and can't be sold`);
+        return;
+      }
+      setProducts(prev => (prev.some((p: any) => p.id === product.id) ? prev : [...prev, product]));
+      const added = formRef.current.productId === product.id;
+      setForm(f => (f.productId === product.id
+        ? { ...f, quantity: f.quantity + 1 }
+        : { ...f, productId: product.id, quantity: 1, sellingPrice: product.sellingPrice ?? 0, costPrice: product.costPrice ?? 0 }));
+      toast.success(added ? `${product.name}: quantity +1` : `${product.name} (Stock: ${product.currentStock})`);
+      if (product.currentStock <= 0) toast.warning(`${product.name} shows 0 in stock`);
+    } catch (e: any) {
+      toast.error(e.message || 'Lookup failed');
+    }
+  };
+
+  const openDialog = async (scanFirst = false) => {
     setForm({ productId: '', quantity: 1, sellingPrice: 0, costPrice: 0, discount: 0, paymentMethodId: '', date: new Date().toISOString().slice(0, 10), notes: '' });
     const [prods, pms, top] = await Promise.all([
       getProducts({ limit: 500 }),
@@ -75,6 +107,7 @@ export default function SalesPage() {
     setPaymentMethods(pms.items.filter((pm: any) => pm.status === 'Active'));
     setTopProducts(top.products || []);
     setDialogOpen(true);
+    if (scanFirst) setScannerOpen(true);
   };
 
   const onProductChange = (productId: string) => {
@@ -96,6 +129,7 @@ export default function SalesPage() {
     return (
       (p.name && p.name.toLowerCase().includes(q)) ||
       (p.sku && p.sku.toLowerCase().includes(q)) ||
+      (p.barcode && p.barcode === productSearch.trim()) ||
       (p.brand && p.brand.toLowerCase().includes(q)) ||
       (p.category && p.category.toLowerCase().includes(q))
     );
@@ -151,7 +185,10 @@ export default function SalesPage() {
           <h1 className="text-2xl font-bold">Sales</h1>
           <p className="text-sm text-muted-foreground">{total} sale{total !== 1 ? 's' : ''} recorded</p>
         </div>
-        <Button onClick={openDialog}><Plus className="w-4 h-4 mr-2" />Record Sale</Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => openDialog(true)}><ScanBarcode className="w-4 h-4 mr-2" />Scan &amp; Sell</Button>
+          <Button onClick={() => openDialog()}><Plus className="w-4 h-4 mr-2" />Record Sale</Button>
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -261,10 +298,11 @@ export default function SalesPage() {
           <div className="space-y-4">
             <div>
               <Label>Product</Label>
+              <div className="flex gap-2">
               <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
-                    {selectedProduct ? `${selectedProduct.name} (Stock: ${selectedProduct.currentStock})` : 'Search or select product...'}
+                  <Button variant="outline" role="combobox" className="flex-1 min-w-0 justify-between font-normal">
+                    <span className="truncate">{selectedProduct ? `${selectedProduct.name} (Stock: ${selectedProduct.currentStock})` : 'Search or select product...'}</span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
@@ -297,7 +335,7 @@ export default function SalesPage() {
                       <Search className="h-4 w-4 text-muted-foreground shrink-0" />
                       <input
                         className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                        placeholder="Search by name, SKU, brand..."
+                        placeholder="Search by name, SKU, barcode, brand..."
                         value={productSearch}
                         onChange={e => setProductSearch(e.target.value)}
                         autoFocus
@@ -351,6 +389,8 @@ export default function SalesPage() {
                   </div>
                 </PopoverContent>
               </Popover>
+              <ScanButton onClick={() => setScannerOpen(true)} />
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div><Label>Quantity</Label><NumericInput min={1} value={form.quantity} onChange={e => setForm(f => ({ ...f, quantity: Number(e.target.value) }))} /></div>
@@ -389,6 +429,13 @@ export default function SalesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <BarcodeScannerDialog
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onDetected={handleScan}
+        title="Scan product to sell"
+      />
     </div>
   );
 }

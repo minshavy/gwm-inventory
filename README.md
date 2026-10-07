@@ -173,3 +173,18 @@ Check the startup logs for `Database: Turso (embedded replica synced from cloud)
 
 To move existing data into Turso: use Download Backup in the app, then
 `turso db import <backup-file>.db` with the Turso CLI.
+
+## Recurring expenses, barcode scanning, monthly goals
+
+**Recurring expenses.** Tick "Repeats monthly" when adding or editing an expense (rent, salaries, subscriptions). The server adds a copy on the same day each month (the 31st becomes the 30th or 28th in shorter months). Copies show an "Auto" badge; the original shows "Monthly". Untick the original to stop. Deleting one copy does not bring it back. If the server was asleep (Render free sleeps after 15 minutes idle), missed months are filled in the next time it wakes.
+
+**Barcode scanning.** Edit a product and fill its Barcode field (type it or tap the scan button). Then:
+- Sales page: "Scan & Sell", or the scan button next to the product picker. Scanning the same item again adds 1 to the quantity.
+- Products page: the scan button shows that product's stock, with an "Adjust stock" shortcut. An unknown code offers "Add product" with the barcode filled in.
+- A code with no barcode match falls back to matching the SKU.
+
+The camera only works on an https:// address (Render and Railway provide one) or on http://localhost. USB and Bluetooth barcode scanners work too: they type into the search box or the "type the barcode" field.
+
+**Monthly goals.** On the Dashboard, tap "Set goal" and enter a revenue goal, a gross profit goal, or both. The card shows "72% of this month's goal", whether you are on pace, and how much per day you still need. A goal carries over to the next month until you change it.
+
+These features add columns and one table to the database automatically on startup. Existing data is not touched.

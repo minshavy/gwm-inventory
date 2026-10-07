@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getProducts, GetProductsOutputType, deleteProduct, getLookups, bulkImportProducts } from '@/lib/api-client';
+import { getProducts, GetProductsOutputType, deleteProduct, getLookups, bulkImportProducts, findProductByCode } from '@/lib/api-client';
+import { BarcodeScannerDialog, ScanButton } from '@/components/BarcodeScanner';
 import { Button } from '@project/components/ui/button';
 import { Input } from '@project/components/ui/input';
 import { Badge } from '@project/components/ui/badge';
@@ -29,6 +30,8 @@ export default function ProductsPage() {
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
   const [categoryOptions, setCategoryOptions] = useState<{ id: string; name: string }[]>([]);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [newBarcode, setNewBarcode] = useState<string | undefined>();
   const PAGE_SIZE = 20;
 
   useEffect(() => {
@@ -80,7 +83,35 @@ export default function ProductsPage() {
     fetchProducts(search, val, 0);
   };
 
+  // Stock check by scan: shows the product's stock straight away and filters
+  // the list to it. Unknown code: offer to create the product with it.
+  const handleScan = async (code: string) => {
+    try {
+      const { product } = await findProductByCode({ code });
+      if (!product) {
+        toast.error(`No product has barcode or SKU "${code}"`, {
+          action: { label: 'Add product', onClick: () => { setNewBarcode(code); setShowAdd(true); } },
+          duration: 8000,
+        });
+        return;
+      }
+      setSearch(code);
+      setPage(0);
+      fetchProducts(code, '', 0);
+      setCategory('');
+      const low = product.currentStock > 0 && product.currentStock <= product.lowStockThreshold;
+      const msg = `${product.name}: ${product.currentStock} ${product.unit || 'Piece'}${product.currentStock === 1 ? '' : 's'} in stock`;
+      const opts = { action: { label: 'Adjust stock', onClick: () => setStockProduct(product) }, duration: 8000 };
+      if (product.currentStock <= 0) toast.error(`${product.name} is out of stock`, opts);
+      else if (low) toast.warning(`${msg} (low)`, opts);
+      else toast.success(msg, opts);
+    } catch (e: any) {
+      toast.error(e.message || 'Lookup failed');
+    }
+  };
+
   const handleSaved = () => {
+    setNewBarcode(undefined);
     setShowAdd(false);
     setEditProduct(null);
     fetchProducts(search, category, page);
@@ -119,8 +150,10 @@ export default function ProductsPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search by name, SKU, or brand..." value={search} onChange={e => handleSearchChange(e.target.value)} className="pl-9" />
+          <Input placeholder="Search by name, SKU, barcode, or brand..." value={search} onChange={e => handleSearchChange(e.target.value)} className="pl-9" />
         </div>
+        <ScanButton onClick={() => setScannerOpen(true)} label="Scan barcode to check stock" className="hidden sm:inline-flex" />
+        <Button variant="outline" className="sm:hidden" onClick={() => setScannerOpen(true)}>Scan barcode to check stock</Button>
         <Select value={category || 'all'} onValueChange={handleCategoryChange}>
           <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Category" /></SelectTrigger>
           <SelectContent>
@@ -226,18 +259,26 @@ export default function ProductsPage() {
 
       <ProductDialog
         open={showAdd || !!editProduct}
-        onClose={() => { setShowAdd(false); setEditProduct(null); }}
+        onClose={() => { setShowAdd(false); setEditProduct(null); setNewBarcode(undefined); }}
         product={editProduct as any}
         onSaved={handleSaved}
+        initialBarcode={newBarcode}
+      />
+
+      <BarcodeScannerDialog
+        open={scannerOpen}
+        onOpenChange={setScannerOpen}
+        onDetected={handleScan}
+        title="Scan to check stock"
       />
 
       <BulkImportDialog
         open={showBulkImport}
         onClose={() => setShowBulkImport(false)}
         title="Bulk import products"
-        headers={['name', 'sku', 'category', 'brand', 'unit', 'description', 'costPrice', 'sellingPrice', 'currentStock', 'lowStockThreshold', 'supplierName']}
+        headers={['name', 'sku', 'barcode', 'category', 'brand', 'unit', 'description', 'costPrice', 'sellingPrice', 'currentStock', 'lowStockThreshold', 'supplierName']}
         sampleRow={{
-          name: 'Sample Perfume 50ml', sku: '', category: 'Perfumes', brand: 'Sample Brand', unit: 'Piece',
+          name: 'Sample Perfume 50ml', sku: '', barcode: '', category: 'Perfumes', brand: 'Sample Brand', unit: 'Piece',
           description: 'Optional description', costPrice: '150', sellingPrice: '250', currentStock: '20', lowStockThreshold: '5', supplierName: '',
         }}
         templateFilename="gwm-products-template.csv"

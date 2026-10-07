@@ -9,9 +9,19 @@ import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { undoableDelete } from '@/lib/undoable-delete';
-import { Plus, Search, Trash2, Pencil, Receipt } from 'lucide-react';
+import { Plus, Search, Trash2, Pencil, Receipt, Repeat } from 'lucide-react';
 import { toast } from 'sonner';
 import NumericInput from '../components/NumericInput';
+
+function RecurringBadge({ ex }: { ex: any }) {
+  if (ex.repeatsMonthly) {
+    return <Badge variant="outline" className="text-[10px] gap-1 border-primary/40 text-primary"><Repeat className="w-3 h-3" />Monthly</Badge>;
+  }
+  if (ex.isAutoCopy) {
+    return <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground"><Repeat className="w-3 h-3" />Auto</Badge>;
+  }
+  return null;
+}
 
 const fmt = (n: number) => `MVR ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -31,7 +41,7 @@ export default function ExpensesPage() {
 
   const [form, setForm] = useState({
     date: new Date().toISOString().slice(0, 10), categoryId: '',
-    description: '', amount: 0, paymentMethodId: '', notes: '',
+    description: '', amount: 0, paymentMethodId: '', notes: '', repeatsMonthly: false,
   });
 
   const load = useCallback(async () => {
@@ -70,10 +80,11 @@ export default function ExpensesPage() {
         amount: expense.amount,
         paymentMethodId: pms.items.find((pm: any) => pm.name === expense.paymentMethod)?.id ?? '',
         notes: expense.notes,
+        repeatsMonthly: !!expense.repeatsMonthly,
       });
     } else {
       setEditId(undefined);
-      setForm({ date: new Date().toISOString().slice(0, 10), categoryId: '', description: '', amount: 0, paymentMethodId: '', notes: '' });
+      setForm({ date: new Date().toISOString().slice(0, 10), categoryId: '', description: '', amount: 0, paymentMethodId: '', notes: '', repeatsMonthly: false });
     }
     setDialogOpen(true);
   };
@@ -91,8 +102,12 @@ export default function ExpensesPage() {
         amount: form.amount,
         paymentMethodId: form.paymentMethodId || undefined,
         notes: form.notes || undefined,
+        repeatsMonthly: form.repeatsMonthly,
       });
-      toast.success(editId ? 'Expense updated' : 'Expense added');
+      toast.success(
+        editId ? 'Expense updated' : 'Expense added',
+        form.repeatsMonthly ? { description: `Repeats on day ${Number(form.date.slice(8, 10))} of every month` } : undefined,
+      );
       setDialogOpen(false);
       load();
     } catch (e: any) {
@@ -150,8 +165,9 @@ export default function ExpensesPage() {
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(ex)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center gap-1.5 text-sm">
                   {ex.categoryName && <Badge variant="secondary" className="text-xs">{ex.categoryName}</Badge>}
+                  <RecurringBadge ex={ex} />
                   <span className="font-medium ml-auto">{fmt(ex.amount)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -181,7 +197,9 @@ export default function ExpensesPage() {
                   <tr key={ex.id} className="border-b last:border-0 hover:bg-muted/30">
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{ex.expenseId}</td>
                     <td className="px-4 py-3">{ex.date ? new Date(ex.date).toLocaleDateString() : '-'}</td>
-                    <td className="px-4 py-3 font-medium">{ex.description}</td>
+                    <td className="px-4 py-3 font-medium">
+                      <span className="inline-flex items-center gap-2">{ex.description} <RecurringBadge ex={ex} /></span>
+                    </td>
                     <td className="px-4 py-3">{ex.categoryName && <Badge variant="secondary">{ex.categoryName}</Badge>}</td>
                     <td className="px-4 py-3 text-right font-medium">{fmt(ex.amount)}</td>
                     <td className="px-4 py-3">{ex.paymentMethod && <Badge variant="outline">{ex.paymentMethod}</Badge>}</td>
@@ -227,6 +245,22 @@ export default function ExpensesPage() {
               </div>
             </div>
             <div><Label>Notes</Label><Input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes" /></div>
+            <label className="flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/40">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 accent-[hsl(var(--primary))]"
+                checked={form.repeatsMonthly}
+                onChange={e => setForm(f => ({ ...f, repeatsMonthly: e.target.checked }))}
+              />
+              <span className="text-sm">
+                <span className="font-medium flex items-center gap-1.5"><Repeat className="w-3.5 h-3.5" /> Repeats monthly</span>
+                <span className="block text-xs text-muted-foreground mt-0.5">
+                  {form.repeatsMonthly
+                    ? `A copy is added automatically on day ${Number(form.date.slice(8, 10)) || 1} of each month (last day in shorter months). Untick to stop.`
+                    : 'For rent, salaries, subscriptions. Saves re-entering it every month.'}
+                </span>
+              </span>
+            </label>
             <Button className="w-full" onClick={handleSave} disabled={saving}>{saving ? 'Saving...' : (editId ? 'Update Expense' : 'Add Expense')}</Button>
           </div>
         </DialogContent>

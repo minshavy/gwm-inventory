@@ -9,11 +9,13 @@ import { Loader2, AlertTriangle, PackagePlus, PlusCircle } from 'lucide-react';
 import { saveProduct, getProducts, recordStockMovement, getLookups, saveLookup, getSuppliers } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { useDebouncedCallback } from 'use-debounce';
+import { BarcodeScannerDialog, ScanButton } from '@/components/BarcodeScanner';
 
 interface Product {
   id: string;
   name: string;
   sku: string;
+  barcode?: string;
   category: string | null;
   brand: string;
   unit: string;
@@ -33,6 +35,9 @@ interface Props {
   onClose: () => void;
   product: Product | null;
   onSaved: () => void;
+  // Prefills the Barcode field on a new product (used after scanning an
+  // unknown barcode on the Products page).
+  initialBarcode?: string;
 }
 
 function generateSku(prefix: string, productName: string): string {
@@ -41,9 +46,11 @@ function generateSku(prefix: string, productName: string): string {
   return `${prefix}-${nameAbbr || 'X'}${num}`;
 }
 
-export default function ProductDialog({ open, onClose, product, onSaved }: Props) {
+export default function ProductDialog({ open, onClose, product, onSaved, initialBarcode }: Props) {
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
+  const [barcode, setBarcode] = useState('');
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [category, setCategory] = useState('');
   const [brand, setBrand] = useState('');
   const [unit, setUnit] = useState('Piece');
@@ -81,7 +88,7 @@ export default function ProductDialog({ open, onClose, product, onSaved }: Props
     setRestockQty(''); setRestockNotes('');
     setShowNewCat(false); setNewCatName('');
     if (product) {
-      setName(product.name); setSku(product.sku); setCategory(product.category ?? '');
+      setName(product.name); setSku(product.sku); setBarcode(product.barcode ?? ''); setCategory(product.category ?? '');
       setBrand(product.brand ?? ''); setUnit(product.unit ?? 'Piece');
       setDescription(product.description);
       setCostPrice(String(product.costPrice ?? '')); setSellingPrice(String(product.sellingPrice ?? ''));
@@ -89,7 +96,7 @@ export default function ProductDialog({ open, onClose, product, onSaved }: Props
       setSupplierId('');
       skuManuallyEdited.current = true;
     } else {
-      setName(''); setSku(''); setCategory(''); setBrand(''); setUnit('Piece');
+      setName(''); setSku(''); setBarcode(initialBarcode ?? ''); setCategory(''); setBrand(''); setUnit('Piece');
       setDescription(''); setCostPrice(''); setSellingPrice('');
       setCurrentStock('0'); setLowStockThreshold('20'); setSupplierId('');
     }
@@ -154,6 +161,7 @@ export default function ProductDialog({ open, onClose, product, onSaved }: Props
         id: product?.id,
         name: name.trim(),
         sku: sku.trim() || undefined,
+        barcode: barcode.trim(),
         category: category || undefined,
         brand: brand.trim() || undefined,
         unit: unit.trim() || undefined,
@@ -166,7 +174,7 @@ export default function ProductDialog({ open, onClose, product, onSaved }: Props
       });
       toast.success(product ? 'Product updated' : 'Product added');
       onSaved();
-    } catch { toast.error('Failed to save product'); }
+    } catch (e: any) { toast.error(e?.message || 'Failed to save product'); }
     finally { setSaving(false); }
   };
 
@@ -246,6 +254,20 @@ export default function ProductDialog({ open, onClose, product, onSaved }: Props
             <div className="grid gap-1.5"><Label>Brand</Label><Input value={brand} onChange={e => setBrand(e.target.value)} placeholder="e.g. Samsung" /></div>
             <div className="grid gap-1.5"><Label>Unit</Label><Input value={unit} onChange={e => setUnit(e.target.value)} placeholder="e.g. Piece, Box, Kg" /></div>
           </div>
+
+          <div className="grid gap-1.5">
+            <Label>Barcode <span className="text-muted-foreground text-xs font-normal">(optional, the number under the bars)</span></Label>
+            <div className="flex gap-2">
+              <Input value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="e.g. 8901030865278" className="font-mono" inputMode="numeric" />
+              <ScanButton onClick={() => setScannerOpen(true)} label="Scan barcode with camera" />
+            </div>
+          </div>
+          <BarcodeScannerDialog
+            open={scannerOpen}
+            onOpenChange={setScannerOpen}
+            onDetected={code => { setBarcode(code); toast.success(`Barcode ${code} added`); }}
+            title="Scan this product's barcode"
+          />
 
           <div className="grid gap-1.5"><Label>Description</Label><Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" rows={2} /></div>
 

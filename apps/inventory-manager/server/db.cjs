@@ -169,6 +169,29 @@ function init() {
   // Migration: track which product came from a supplier login (vs admin).
   ensureColumn('Products', 'createdByUserId', 'createdByUserId TEXT');
 
+  // Migration: recurring monthly expenses.
+  //   repeatsMonthly      1 on the "template" expense you ticked "Repeats monthly" on
+  //   recurringLastMonth  last month (YYYY-MM) a copy was made for, so a copy you
+  //                       delete on purpose is never re-created
+  //   recurringSourceId   on each auto-created copy, points back to its template
+  ensureColumn('Expenses', 'repeatsMonthly', 'repeatsMonthly INTEGER DEFAULT 0');
+  ensureColumn('Expenses', 'recurringLastMonth', 'recurringLastMonth TEXT');
+  ensureColumn('Expenses', 'recurringSourceId', 'recurringSourceId TEXT');
+
+  // Migration: product barcodes (EAN/UPC etc.) for camera scanning.
+  ensureColumn('Products', 'barcode', 'barcode TEXT');
+
+  // Monthly sales goals. One row per month (YYYY-MM). A month with no row
+  // falls back to the most recent earlier goal, so you set it once.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS "SalesTargets" (
+      month TEXT PRIMARY KEY,
+      revenueTarget REAL DEFAULT 0,
+      profitTarget REAL DEFAULT 0,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+  `);
+
   // Data fix: an earlier version of the Payment Methods form saved
   // lowercase 'active'/'disabled' instead of 'Active'/'Disabled', which
   // silently hid those payment methods from the Record Sale and Expense

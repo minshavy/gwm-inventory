@@ -33,6 +33,8 @@ export const globalSearch = (input: any) => call('globalSearch', input);
 export const getTopSellingProducts = () => call('getTopSellingProducts', {});
 export const saveProduct = (input: any) => call('saveProduct', input);
 export const deleteProduct = (input: any) => call('deleteProduct', input);
+export const findProductByCode = (input: { code: string }) => call<any, any>('findProductByCode', input);
+export const saveSalesTarget = (input: { revenueTarget: number; profitTarget: number; month?: string }) => call<any, any>('saveSalesTarget', input);
 
 export const getMovements = (input: any) => call('getMovements', input);
 export const recordStockMovement = (input: any) => call('recordStockMovement', input);
@@ -88,7 +90,7 @@ export const recordPayout = (input: any) => call('admin/recordPayout', input);
 export const deletePayout = (input: any) => call('admin/deletePayout', input);
 
 export const api = {
-  getProducts, saveProduct, deleteProduct, globalSearch, getTopSellingProducts,
+  getProducts, saveProduct, deleteProduct, globalSearch, getTopSellingProducts, findProductByCode, saveSalesTarget,
   getMovements, recordStockMovement,
   getSales, recordSale, deleteSale,
   getExpenses, saveExpense, deleteExpense,

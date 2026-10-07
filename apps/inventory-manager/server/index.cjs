@@ -529,9 +529,9 @@ app.post('/api/globalSearch', requireAdmin, (req, res) => {
 
   const products = db.prepare(`
     SELECT id, name, sku, sellingPrice, currentStock FROM "Products"
-    WHERE LOWER(name) LIKE ? OR LOWER(sku) LIKE ? OR LOWER(brand) LIKE ?
+    WHERE LOWER(name) LIKE ? OR LOWER(sku) LIKE ? OR LOWER(brand) LIKE ? OR barcode = ?
     ORDER BY name ASC LIMIT 5
-  `).all(like, like, like);
+  `).all(like, like, like, q);
 
   const suppliers = db.prepare(`
     SELECT id, name, phone, email FROM "Suppliers"
@@ -579,9 +579,9 @@ app.post('/api/getProducts', requireAdmin, (req, res) => {
   let params = [];
   if (id) { where.push(`id = ?`); params.push(id); }
   if (search) {
-    where.push(`(LOWER(name) LIKE ? OR LOWER(sku) LIKE ? OR LOWER(brand) LIKE ?)`);
+    where.push(`(LOWER(name) LIKE ? OR LOWER(sku) LIKE ? OR LOWER(brand) LIKE ? OR barcode = ?)`);
     const q = `%${search.toLowerCase()}%`;
-    params.push(q, q, q);
+    params.push(q, q, q, String(search).trim());
   }
   if (category) { where.push(`category = ?`); params.push(category); }
   if (status) { where.push(`status = ?`); params.push(status); }
@@ -594,7 +594,7 @@ app.post('/api/getProducts', requireAdmin, (req, res) => {
 
   res.json({
     products: rows.map(r => ({
-      id: r.id, name: r.name || '', sku: r.sku || '', category: r.category || null,
+      id: r.id, name: r.name || '', sku: r.sku || '', barcode: r.barcode || '', category: r.category || null,
       brand: r.brand || '', unit: r.unit || 'Piece', description: r.description || '',
       costPrice: r.costPrice ?? 0, sellingPrice: r.sellingPrice ?? r.unitPrice ?? 0,
       currentStock: r.currentStock ?? 0, lowStockThreshold: r.lowStockThreshold ?? 20,
@@ -607,7 +607,13 @@ app.post('/api/getProducts', requireAdmin, (req, res) => {
 
 app.post('/api/saveProduct', requireAdmin, (req, res) => {
   const b = req.body || {};
+  b.barcode = String(b.barcode || '').trim() || null;
+  if (b.barcode) {
+    const clash = db.prepare(`SELECT name FROM "Products" WHERE barcode = ? AND id != ?`).get(b.barcode, b.id || '');
+    if (clash) return res.status(400).json({ error: `Barcode ${b.barcode} is already used by "${clash.name}".` });
+  }
   if (b.id) {
+    db.prepare(`UPDATE "Products" SET barcode=? WHERE id=?`).run(b.barcode, b.id);
     db.prepare(`
       UPDATE "Products" SET name=?, sku=?, category=?, brand=?, unit=?, description=?,
         costPrice=?, sellingPrice=?, unitPrice=?, currentStock=?, lowStockThreshold=?, status=?
@@ -631,16 +637,37 @@ app.post('/api/saveProduct', requireAdmin, (req, res) => {
   }
   const id = uuid();
   db.prepare(`
-    INSERT INTO "Products" (id, name, sku, category, brand, unit, description, costPrice, sellingPrice, unitPrice, currentStock, lowStockThreshold, status)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO "Products" (id, name, sku, barcode, category, brand, unit, description, costPrice, sellingPrice, unitPrice, currentStock, lowStockThreshold, status)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
-    id, b.name, b.sku ?? null, b.category ?? null, b.brand ?? null, b.unit ?? 'Piece',
+    id, b.name, b.sku ?? null, b.barcode, b.category ?? null, b.brand ?? null, b.unit ?? 'Piece',
     b.description ?? null, b.costPrice ?? null, b.sellingPrice ?? null, b.sellingPrice ?? null,
     b.currentStock ?? 0, b.lowStockThreshold ?? 20, b.status ?? 'Active'
   );
   if (b.supplierId) db.prepare(`INSERT INTO "ProductsSuppliers" (productsId, suppliersId) VALUES (?,?)`).run(id, b.supplierId);
   logActivity(req.user.username, 'admin', `Added product "${b.name}"`);
   res.json({ success: true, id });
+});
+
+// Barcode scan lookup: exact barcode match first, then SKU (case-insensitive),
+// so products without a barcode yet can still be found by a printed SKU label.
+app.post('/api/findProductByCode', requireAdmin, (req, res) => {
+  const code = String((req.body || {}).code || '').trim();
+  if (!code) return res.status(400).json({ error: 'No code scanned' });
+  const row =
+    db.prepare(`SELECT * FROM "Products" WHERE barcode = ? LIMIT 1`).get(code) ||
+    db.prepare(`SELECT * FROM "Products" WHERE LOWER(sku) = LOWER(?) LIMIT 1`).get(code);
+  if (!row) return res.json({ product: null, code });
+  res.json({
+    code,
+    product: {
+      id: row.id, name: row.name || '', sku: row.sku || '', barcode: row.barcode || '',
+      category: row.category || null, unit: row.unit || 'Piece',
+      costPrice: row.costPrice ?? 0, sellingPrice: row.sellingPrice ?? row.unitPrice ?? 0,
+      currentStock: row.currentStock ?? 0, lowStockThreshold: row.lowStockThreshold ?? 20,
+      status: row.status || 'Active',
+    },
+  });
 });
 
 app.post('/api/deleteProduct', requireAdmin, (req, res) => {
@@ -665,9 +692,10 @@ app.post('/api/bulkImportProducts', requireAdmin, (req, res) => {
     db.prepare(`SELECT id, name FROM "Suppliers"`).all().map(s => [s.name.trim().toLowerCase(), s.id])
   );
   const insertProduct = db.prepare(`
-    INSERT INTO "Products" (id, name, sku, category, brand, unit, description, costPrice, sellingPrice, unitPrice, currentStock, lowStockThreshold, status)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO "Products" (id, name, sku, barcode, category, brand, unit, description, costPrice, sellingPrice, unitPrice, currentStock, lowStockThreshold, status)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
   `);
+  const barcodeTaken = db.prepare(`SELECT 1 FROM "Products" WHERE barcode = ?`);
   const linkSupplier = db.prepare(`INSERT INTO "ProductsSuppliers" (productsId, suppliersId) VALUES (?,?)`);
 
   const results = { inserted: 0, errors: [] };
@@ -689,8 +717,13 @@ app.post('/api/bulkImportProducts', requireAdmin, (req, res) => {
     const id = uuid();
     const sku = (r.sku || '').trim() || `AUTO-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
+    let barcode = String(r.barcode || '').trim() || null;
+    if (barcode && barcodeTaken.get(barcode)) {
+      results.errors.push({ row: rowNum, error: `Added, but barcode ${barcode} is already used by another product — left blank` });
+      barcode = null;
+    }
     insertProduct.run(
-      id, name, sku, r.category || null, r.brand || null, r.unit || 'Piece', r.description || null,
+      id, name, sku, barcode, r.category || null, r.brand || null, r.unit || 'Piece', r.description || null,
       costPrice, sellingPrice, sellingPrice, currentStock, lowStockThreshold, 'Active'
     );
 
@@ -875,6 +908,7 @@ app.post('/api/deleteSale', requireAdmin, (req, res) => {
 
 // ---------- Expenses (admin only) ----------
 app.post('/api/getExpenses', requireAdmin, (req, res) => {
+  generateRecurringExpenses();
   const { search, dateFrom, dateTo, categoryId, offset = 0, limit = 50 } = req.body || {};
   let where = [];
   let params = [];
@@ -890,9 +924,11 @@ app.post('/api/getExpenses', requireAdmin, (req, res) => {
     LEFT JOIN "PaymentMethods" pm ON pm.id = epm.paymentMethodsId
   `;
 
+  // Sum each matching expense once. (SUM(DISTINCT amount) undercounted when
+  // two expenses had the same amount, e.g. the same rent every month.)
   const totalsRow = db.prepare(`
-    SELECT COUNT(DISTINCT e.id) AS total, COALESCE(SUM(DISTINCT e.amount),0) AS totalAmount
-    FROM "Expenses" e ${joins} ${whereSql}
+    SELECT COUNT(*) AS total, COALESCE(SUM(amount),0) AS totalAmount
+    FROM "Expenses" WHERE id IN (SELECT e.id FROM "Expenses" e ${joins} ${whereSql})
   `).get(...params);
 
   const rows = db.prepare(`
@@ -908,6 +944,7 @@ app.post('/api/getExpenses', requireAdmin, (req, res) => {
       id: r.id, expenseId: r.expenseId, date: r.date, description: r.description || '',
       amount: r.amount ?? 0, categoryName: r.categoryName || '',
       paymentMethod: r.paymentMethodName || '', notes: r.notes || '',
+      repeatsMonthly: !!r.repeatsMonthly, isAutoCopy: !!r.recurringSourceId,
     })),
     hasMore: offset + limit < totalsRow.total,
     total: totalsRow.total,
@@ -920,31 +957,105 @@ app.post('/api/saveExpense', requireAdmin, (req, res) => {
   if (b.id) {
     db.prepare(`UPDATE "Expenses" SET date=?, description=?, amount=?, notes=? WHERE id=?`)
       .run(b.date, b.description, b.amount, b.notes ?? null, b.id);
+    if (typeof b.repeatsMonthly === 'boolean') {
+      // Turning it on starts the schedule from this expense's own month, so
+      // next month is the first auto-copy. Turning it off stops future copies;
+      // copies already made stay as normal expenses.
+      db.prepare(`
+        UPDATE "Expenses" SET repeatsMonthly = ?,
+          recurringLastMonth = CASE WHEN ? = 1 THEN COALESCE(recurringLastMonth, ?) ELSE recurringLastMonth END
+        WHERE id = ?
+      `).run(b.repeatsMonthly ? 1 : 0, b.repeatsMonthly ? 1 : 0, String(b.date).slice(0, 7), b.id);
+    }
     db.prepare(`DELETE FROM "ExpenseCategoriesExpenses" WHERE expensesId=?`).run(b.id);
     db.prepare(`DELETE FROM "ExpensesPaymentMethods" WHERE expensesId=?`).run(b.id);
     if (b.categoryId) db.prepare(`INSERT INTO "ExpenseCategoriesExpenses" (expenseCategoriesId, expensesId) VALUES (?,?)`).run(b.categoryId, b.id);
     if (b.paymentMethodId) db.prepare(`INSERT INTO "ExpensesPaymentMethods" (expensesId, paymentMethodsId) VALUES (?,?)`).run(b.id, b.paymentMethodId);
     logActivity(req.user.username, 'admin', `Edited expense "${b.description}"`);
+    if (b.repeatsMonthly) generateRecurringExpenses();
     return res.json({ success: true, id: b.id });
   }
   const id = uuid();
   const expenseId = nextCounter('Expenses', 'expenseId');
-  db.prepare(`INSERT INTO "Expenses" (id, expenseId, date, description, amount, notes, recordedBy) VALUES (?,?,?,?,?,?,?)`)
-    .run(id, expenseId, b.date, b.description, b.amount, b.notes ?? null, req.user.username);
+  db.prepare(`INSERT INTO "Expenses" (id, expenseId, date, description, amount, notes, recordedBy, repeatsMonthly, recurringLastMonth) VALUES (?,?,?,?,?,?,?,?,?)`)
+    .run(id, expenseId, b.date, b.description, b.amount, b.notes ?? null, req.user.username,
+      b.repeatsMonthly ? 1 : 0, b.repeatsMonthly ? String(b.date).slice(0, 7) : null);
   if (b.categoryId) db.prepare(`INSERT INTO "ExpenseCategoriesExpenses" (expenseCategoriesId, expensesId) VALUES (?,?)`).run(b.categoryId, id);
   if (b.paymentMethodId) db.prepare(`INSERT INTO "ExpensesPaymentMethods" (expensesId, paymentMethodsId) VALUES (?,?)`).run(id, b.paymentMethodId);
-  logActivity(req.user.username, 'admin', `Added expense "${b.description}"`);
+  logActivity(req.user.username, 'admin', `Added expense "${b.description}"${b.repeatsMonthly ? ' (repeats monthly)' : ''}`);
+  // A template dated in an earlier month catches up straight away.
+  if (b.repeatsMonthly) generateRecurringExpenses();
   res.json({ success: true, id });
 });
 
 app.post('/api/deleteExpense', requireAdmin, (req, res) => {
   const existing = db.prepare(`SELECT description FROM "Expenses" WHERE id=?`).get(req.body.id);
   db.prepare(`DELETE FROM "Expenses" WHERE id=?`).run(req.body.id);
+  db.prepare(`DELETE FROM "ExpenseCategoriesExpenses" WHERE expensesId=?`).run(req.body.id);
+  db.prepare(`DELETE FROM "ExpensesPaymentMethods" WHERE expensesId=?`).run(req.body.id);
   logActivity(req.user.username, 'admin', `Deleted expense "${existing?.description || req.body.id}"`);
   res.json({ success: true });
 });
 
+// ---------- Recurring monthly expenses ----------
+// For every expense marked "Repeats monthly", create one copy per month on
+// the same day of the month (the 31st becomes the 30th/28th in shorter
+// months). A copy is only made once its date has arrived, and months missed
+// while the server was asleep are caught up. recurringLastMonth on the
+// template records progress, so deleting a copy on purpose does not bring it
+// back.
+function ymAdd(ym, n) {
+  const [y, m] = ym.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 7);
+}
+function generateRecurringExpenses() {
+  const today = new Date().toISOString().slice(0, 10);
+  const thisMonth = today.slice(0, 7);
+  const templates = db.prepare(`
+    SELECT e.*, MAX(ecl.expenseCategoriesId) AS categoryId, MAX(epm.paymentMethodsId) AS paymentMethodId
+    FROM "Expenses" e
+    LEFT JOIN "ExpenseCategoriesExpenses" ecl ON ecl.expensesId = e.id
+    LEFT JOIN "ExpensesPaymentMethods" epm ON epm.expensesId = e.id
+    WHERE e.repeatsMonthly = 1
+    GROUP BY e.id
+  `).all();
+  let created = 0;
+  for (const t of templates) {
+    if (!t.date) continue;
+    const day = Number(String(t.date).slice(8, 10)) || 1;
+    let ym = ymAdd(t.recurringLastMonth || String(t.date).slice(0, 7), 1);
+    while (ym <= thisMonth) {
+      const [y, m] = ym.split('-').map(Number);
+      const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const date = `${ym}-${String(Math.min(day, daysInMonth)).padStart(2, '0')}`;
+      if (date > today) break; // not due yet this month
+      const month = ym;
+      db.transaction(() => {
+        const id = uuid();
+        const expenseId = nextCounter('Expenses', 'expenseId');
+        db.prepare(`INSERT INTO "Expenses" (id, expenseId, date, description, amount, notes, recordedBy, recurringSourceId) VALUES (?,?,?,?,?,?,?,?)`)
+          .run(id, expenseId, date, t.description, t.amount, t.notes ?? null, 'auto (monthly)', t.id);
+        if (t.categoryId) db.prepare(`INSERT INTO "ExpenseCategoriesExpenses" (expenseCategoriesId, expensesId) VALUES (?,?)`).run(t.categoryId, id);
+        if (t.paymentMethodId) db.prepare(`INSERT INTO "ExpensesPaymentMethods" (expensesId, paymentMethodsId) VALUES (?,?)`).run(id, t.paymentMethodId);
+        db.prepare(`UPDATE "Expenses" SET recurringLastMonth = ? WHERE id = ?`).run(month, t.id);
+      })();
+      created++;
+      ym = ymAdd(ym, 1);
+    }
+  }
+  if (created > 0) {
+    logActivity('system', 'admin', `Added ${created} recurring monthly expense${created === 1 ? '' : 's'}`);
+  }
+  return created;
+}
+function runRecurringSafely() {
+  try { generateRecurringExpenses(); } catch (e) { console.error('Recurring expenses failed:', e.message); }
+}
+runRecurringSafely();
+setInterval(runRecurringSafely, 60 * 60 * 1000).unref();
+
 // ---------- Suppliers (admin only) ----------
+
 app.post('/api/getSuppliers', requireAdmin, (req, res) => {
   const { search, offset = 0, limit = 50 } = req.body || {};
   let where = [];
@@ -1142,8 +1253,24 @@ app.post('/api/getDashboard', requireAdmin, (req, res) => {
     hasSupplier: db.prepare(`SELECT COUNT(*) AS c FROM "Suppliers"`).get().c > 0,
   };
 
+  const month = today.slice(0, 7);
+  const targetRow =
+    db.prepare(`SELECT * FROM "SalesTargets" WHERE month = ?`).get(month) ||
+    db.prepare(`SELECT * FROM "SalesTargets" WHERE month < ? ORDER BY month DESC LIMIT 1`).get(month);
+  const [ty, tm] = month.split('-').map(Number);
+  const daysInMonth = new Date(Date.UTC(ty, tm, 0)).getUTCDate();
+  const salesTarget = {
+    month,
+    revenueTarget: targetRow?.revenueTarget ?? 0,
+    profitTarget: targetRow?.profitTarget ?? 0,
+    carriedOver: !!targetRow && targetRow.month !== month,
+    dayOfMonth: Number(today.slice(8, 10)),
+    daysInMonth,
+  };
+
   res.json({
     setup,
+    salesTarget,
     totalProducts: ps.totalProducts ?? 0,
     totalStockValue: ps.totalStockValue ?? 0,
     lowStockCount: ps.lowStockCount ?? 0,
@@ -1179,6 +1306,22 @@ app.post('/api/getDashboard', requireAdmin, (req, res) => {
     expensesByCategory: expensesByCategory.map(r => ({ category: r.category, amount: r.amount })),
     topProducts: topProducts.map(r => ({ name: r.name, revenue: r.revenue, quantity: r.quantity })),
   });
+});
+
+// ---------- Monthly sales goal ----------
+// Saves the goal for the current month (or a given YYYY-MM). 0 means "no goal".
+app.post('/api/saveSalesTarget', requireAdmin, (req, res) => {
+  const b = req.body || {};
+  const month = /^\d{4}-\d{2}$/.test(b.month || '') ? b.month : new Date().toISOString().slice(0, 7);
+  const revenueTarget = Math.max(0, Number(b.revenueTarget) || 0);
+  const profitTarget = Math.max(0, Number(b.profitTarget) || 0);
+  db.prepare(`
+    INSERT INTO "SalesTargets" (month, revenueTarget, profitTarget, updated_at) VALUES (?,?,?,datetime('now'))
+    ON CONFLICT(month) DO UPDATE SET revenueTarget = excluded.revenueTarget,
+      profitTarget = excluded.profitTarget, updated_at = excluded.updated_at
+  `).run(month, revenueTarget, profitTarget);
+  logActivity(req.user.username, 'admin', `Set ${month} goal: revenue MVR ${revenueTarget}, profit MVR ${profitTarget}`);
+  res.json({ success: true, month, revenueTarget, profitTarget });
 });
 
 // ---------- Profit & Loss ----------
@@ -1306,7 +1449,7 @@ app.post('/api/admin/resetAllData', requireAdmin, (req, res) => {
     'ExpenseCategoriesExpenses', 'ExpensesPaymentMethods',
     'StockMovements', 'Sales', 'Expenses', 'Products',
     'Categories', 'ExpenseCategories', 'PaymentMethods', 'Suppliers',
-    'Notifications', 'StockUpdateRequests', 'SupplierPayouts',
+    'Notifications', 'StockUpdateRequests', 'SupplierPayouts', 'SalesTargets',
   ];
   const wipe = db.transaction(() => {
     for (const t of tables) db.prepare(`DELETE FROM "${t}"`).run();
