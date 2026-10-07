@@ -187,4 +187,8 @@ The camera only works on an https:// address (Render and Railway provide one) or
 
 **Monthly goals.** On the Dashboard, tap "Set goal" and enter a revenue goal, a gross profit goal, or both. The card shows "72% of this month's goal", whether you are on pace, and how much per day you still need. A goal carries over to the next month until you change it.
 
+**Auto-generated barcodes and labels.** Add a product without a barcode and the app gives it one: an EAN-13 starting with 200 (2000000000015, 2000000000022, and so on). GS1 reserves the 200 prefix for in-store use, so these never clash with real manufacturer barcodes. If the product already has a barcode on its packaging, scan or type that instead. The magic-wand button next to the Barcode field creates one on demand, and "Generate barcodes" on the Products page fills in every existing product that has none.
+
+To print stickers: edit a product and tap "Print label", or tap "Print labels" on the Products page to print every product in the current search or category. Choose an A4 sticker sheet (24 labels of 64 x 34 mm) or a label printer (50 x 30 mm). In the print dialog, set scale to 100% and turn off headers and footers.
+
 These features add columns and one table to the database automatically on startup. Existing data is not touched.

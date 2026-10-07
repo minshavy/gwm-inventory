@@ -1,13 +1,14 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getProducts, GetProductsOutputType, deleteProduct, getLookups, bulkImportProducts, findProductByCode } from '@/lib/api-client';
+import { getProducts, GetProductsOutputType, deleteProduct, getLookups, bulkImportProducts, findProductByCode, generateMissingBarcodes } from '@/lib/api-client';
+import { PrintLabelsDialog } from '@/components/PrintLabelsDialog';
 import { BarcodeScannerDialog, ScanButton } from '@/components/BarcodeScanner';
 import { Button } from '@project/components/ui/button';
 import { Input } from '@project/components/ui/input';
 import { Badge } from '@project/components/ui/badge';
 import { Skeleton } from '@project/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@project/components/ui/select';
-import { Plus, Search, Trash2, Package, Upload } from 'lucide-react';
+import { Plus, Search, Trash2, Package, Upload, Printer, Wand2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDebouncedCallback } from 'use-debounce';
 import ProductDialog from '../components/ProductDialog';
@@ -32,6 +33,9 @@ export default function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [scannerOpen, setScannerOpen] = useState(false);
   const [newBarcode, setNewBarcode] = useState<string | undefined>();
+  const [missingBarcodes, setMissingBarcodes] = useState(0);
+  const [generatingAll, setGeneratingAll] = useState(false);
+  const [labelsOpen, setLabelsOpen] = useState(false);
   const PAGE_SIZE = 20;
 
   useEffect(() => {
@@ -62,6 +66,7 @@ export default function ProductsPage() {
       });
       setProducts(res.products);
       setTotal(res.total);
+      setMissingBarcodes(res.missingBarcodes ?? 0);
     } finally {
       setLoading(false);
     }
@@ -110,6 +115,27 @@ export default function ProductsPage() {
     }
   };
 
+  const handleGenerateAll = async () => {
+    setGeneratingAll(true);
+    try {
+      const { count } = await generateMissingBarcodes();
+      toast.success(`Generated barcodes for ${count} product${count === 1 ? '' : 's'}`, {
+        description: 'Tap "Print labels" to print stickers for them.',
+      });
+      fetchProducts(search, category, page);
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to generate barcodes');
+    } finally {
+      setGeneratingAll(false);
+    }
+  };
+
+  // Labels for every product matching the current search and category.
+  const loadLabelItems = async () => {
+    const res: any = await getProducts({ search: search || undefined, category: category || undefined, limit: 2000 });
+    return res.products.map((p: any) => ({ name: p.name, barcode: p.barcode, price: p.sellingPrice }));
+  };
+
   const handleSaved = () => {
     setNewBarcode(undefined);
     setShowAdd(false);
@@ -137,7 +163,10 @@ export default function ProductsPage() {
           <h2 className="text-xl font-semibold">Products</h2>
           {!loading && <p className="text-sm text-muted-foreground mt-0.5">{total} product{total !== 1 ? 's' : ''} total</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setLabelsOpen(true)} disabled={total === 0}>
+            <Printer className="w-4 h-4 mr-1.5" /> Print labels
+          </Button>
           <Button variant="outline" onClick={() => setShowBulkImport(true)}>
             <Upload className="w-4 h-4 mr-1.5" /> Bulk Import
           </Button>
@@ -146,6 +175,19 @@ export default function ProductsPage() {
           </Button>
         </div>
       </div>
+
+      {missingBarcodes > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-dashed p-3 text-sm">
+          <span>
+            <span className="font-medium">{missingBarcodes} product{missingBarcodes === 1 ? '' : 's'}</span> {missingBarcodes === 1 ? 'has' : 'have'} no barcode yet.
+            <span className="text-muted-foreground"> New products get one automatically.</span>
+          </span>
+          <Button size="sm" variant="outline" onClick={handleGenerateAll} disabled={generatingAll}>
+            {generatingAll ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5 mr-1.5" />}
+            Generate barcodes
+          </Button>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -263,6 +305,14 @@ export default function ProductsPage() {
         product={editProduct as any}
         onSaved={handleSaved}
         initialBarcode={newBarcode}
+      />
+
+      <PrintLabelsDialog
+        open={labelsOpen}
+        onOpenChange={setLabelsOpen}
+        count={total}
+        title={search || category ? 'Print labels for these products' : 'Print labels for all products'}
+        items={loadLabelItems}
       />
 
       <BarcodeScannerDialog

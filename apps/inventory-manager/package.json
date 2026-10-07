@@ -28,6 +28,7 @@
     "date-fns": "^3.6.0",
     "express": "^4.21.2",
     "framer-motion": "^12.34.3",
+    "jsbarcode": "^3.12.3",
     "jsonwebtoken": "^9.0.2",
     "libsql": "^0.5.29",
     "lucide-react": "^0.476.0",

@@ -415,6 +415,7 @@ app.post('/api/supplier/saveProduct', requireSupplier, (req, res) => {
     (b.currentStock ?? 0) <= 0 ? 'Out of Stock' : 'Active', req.user.id
   );
   db.prepare(`INSERT INTO "ProductsSuppliers" (productsId, suppliersId) VALUES (?,?)`).run(id, supplierId);
+  assignBarcodeIfMissing(id);
 
   if ((b.currentStock ?? 0) > 0) {
     const moveId = uuid();
@@ -488,6 +489,7 @@ app.post('/api/supplier/bulkImportProducts', requireSupplier, (req, res) => {
       costPrice, currentStock, lowStockThreshold, status, req.user.id
     );
     linkSupplier.run(id, supplierId);
+    assignBarcodeIfMissing(id);
 
     if (currentStock > 0) {
       const moveId = uuid();
@@ -522,6 +524,53 @@ app.post('/api/supplier/deleteProduct', requireSupplier, (req, res) => {
 // Searches products, suppliers, expenses, and sales (by product name) all
 // at once — powers the header search box so you don't have to hunt through
 // pages one at a time.
+// ---------- Auto-generated barcodes ----------
+// New products get an EAN-13 barcode automatically when you don't enter
+// one. Codes start with 200, a prefix GS1 reserves for in-store use, so they
+// never clash with a manufacturer's barcode. Numbers count up:
+// 2000000000015, 2000000000022, ... The last digit is the EAN check digit
+// that scanners verify.
+function eanCheckDigit(d12) {
+  let sum = 0;
+  for (let i = 0; i < 12; i++) sum += Number(d12[i]) * (i % 2 === 0 ? 1 : 3);
+  return (10 - (sum % 10)) % 10;
+}
+function nextInternalBarcode() {
+  const row = db.prepare(`
+    SELECT MAX(CAST(substr(barcode, 4, 9) AS INTEGER)) AS m FROM "Products"
+    WHERE barcode GLOB '200[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'
+  `).get();
+  const exists = db.prepare(`SELECT 1 FROM "Products" WHERE barcode = ?`);
+  let n = (row.m ?? 0) + 1;
+  for (;;) {
+    const d12 = '200' + String(n).padStart(9, '0');
+    const code = d12 + eanCheckDigit(d12);
+    if (!exists.get(code)) return code;
+    n++;
+  }
+}
+function assignBarcodeIfMissing(productId) {
+  const r = db.prepare(`SELECT barcode FROM "Products" WHERE id = ?`).get(productId);
+  if (!r || (r.barcode && String(r.barcode).trim())) return r?.barcode || null;
+  const code = nextInternalBarcode();
+  db.prepare(`UPDATE "Products" SET barcode = ? WHERE id = ?`).run(code, productId);
+  return code;
+}
+
+// Next free code, for the "Generate" button on a product (not saved yet).
+app.post('/api/generateBarcode', requireAdmin, (req, res) => {
+  res.json({ barcode: nextInternalBarcode() });
+});
+
+// Gives every product that has no barcode yet its own generated one.
+app.post('/api/generateMissingBarcodes', requireAdmin, (req, res) => {
+  const ids = db.prepare(`SELECT id FROM "Products" WHERE barcode IS NULL OR TRIM(barcode) = '' ORDER BY created_at ASC, name ASC`).all();
+  db.transaction(() => { for (const r of ids) assignBarcodeIfMissing(r.id); })();
+  if (ids.length) logActivity(req.user.username, 'admin', `Generated barcodes for ${ids.length} product${ids.length === 1 ? '' : 's'}`);
+  res.json({ success: true, count: ids.length });
+});
+
+// ---------- Global search ----------
 app.post('/api/globalSearch', requireAdmin, (req, res) => {
   const q = String((req.body || {}).query || '').trim().toLowerCase();
   if (q.length < 2) return res.json({ products: [], suppliers: [], expenses: [], sales: [] });
@@ -602,6 +651,7 @@ app.post('/api/getProducts', requireAdmin, (req, res) => {
     })),
     hasMore: offset + limit < total,
     total,
+    missingBarcodes: db.prepare(`SELECT COUNT(*) AS c FROM "Products" WHERE barcode IS NULL OR TRIM(barcode) = ''`).get().c,
   });
 });
 
@@ -636,6 +686,7 @@ app.post('/api/saveProduct', requireAdmin, (req, res) => {
     return res.json({ success: true, id: b.id });
   }
   const id = uuid();
+  if (!b.barcode) b.barcode = nextInternalBarcode();
   db.prepare(`
     INSERT INTO "Products" (id, name, sku, barcode, category, brand, unit, description, costPrice, sellingPrice, unitPrice, currentStock, lowStockThreshold, status)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
@@ -646,7 +697,7 @@ app.post('/api/saveProduct', requireAdmin, (req, res) => {
   );
   if (b.supplierId) db.prepare(`INSERT INTO "ProductsSuppliers" (productsId, suppliersId) VALUES (?,?)`).run(id, b.supplierId);
   logActivity(req.user.username, 'admin', `Added product "${b.name}"`);
-  res.json({ success: true, id });
+  res.json({ success: true, id, barcode: b.barcode });
 });
 
 // Barcode scan lookup: exact barcode match first, then SKU (case-insensitive),
@@ -722,6 +773,7 @@ app.post('/api/bulkImportProducts', requireAdmin, (req, res) => {
       results.errors.push({ row: rowNum, error: `Added, but barcode ${barcode} is already used by another product — left blank` });
       barcode = null;
     }
+    if (!barcode) barcode = nextInternalBarcode();
     insertProduct.run(
       id, name, sku, barcode, r.category || null, r.brand || null, r.unit || 'Piece', r.description || null,
       costPrice, sellingPrice, sellingPrice, currentStock, lowStockThreshold, 'Active'

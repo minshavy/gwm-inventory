@@ -5,11 +5,13 @@ import { Input } from '@project/components/ui/input';
 import { Label } from '@project/components/ui/label';
 import { Textarea } from '@project/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@project/components/ui/select';
-import { Loader2, AlertTriangle, PackagePlus, PlusCircle } from 'lucide-react';
-import { saveProduct, getProducts, recordStockMovement, getLookups, saveLookup, getSuppliers } from '@/lib/api-client';
+import { Loader2, AlertTriangle, PackagePlus, PlusCircle, Wand2, Printer } from 'lucide-react';
+import { saveProduct, generateBarcode, getProducts, recordStockMovement, getLookups, saveLookup, getSuppliers } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { useDebouncedCallback } from 'use-debounce';
 import { BarcodeScannerDialog, ScanButton } from '@/components/BarcodeScanner';
+import { PrintLabelsDialog } from '@/components/PrintLabelsDialog';
+import { barcodeSvg } from '@/lib/barcode-labels';
 
 interface Product {
   id: string;
@@ -51,6 +53,18 @@ export default function ProductDialog({ open, onClose, product, onSaved, initial
   const [sku, setSku] = useState('');
   const [barcode, setBarcode] = useState('');
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [labelsOpen, setLabelsOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerateBarcode = async () => {
+    setGenerating(true);
+    try { setBarcode((await generateBarcode()).barcode); }
+    catch (e: any) { toast.error(e?.message || 'Could not generate a barcode'); }
+    finally { setGenerating(false); }
+  };
+
+  let barcodePreview = '';
+  if (barcode.trim()) { try { barcodePreview = barcodeSvg(barcode.trim(), { height: 40, fontSize: 13 }); } catch { barcodePreview = ''; } }
   const [category, setCategory] = useState('');
   const [brand, setBrand] = useState('');
   const [unit, setUnit] = useState('Piece');
@@ -157,7 +171,7 @@ export default function ProductDialog({ open, onClose, product, onSaved, initial
     if (!name.trim()) { toast.error('Product name is required'); return; }
     setSaving(true);
     try {
-      await saveProduct({
+      const saved: any = await saveProduct({
         id: product?.id,
         name: name.trim(),
         sku: sku.trim() || undefined,
@@ -172,7 +186,9 @@ export default function ProductDialog({ open, onClose, product, onSaved, initial
         lowStockThreshold: lowStockThreshold ? Number(lowStockThreshold) : 20,
         supplierId: supplierId || undefined,
       });
-      toast.success(product ? 'Product updated' : 'Product added');
+      toast.success(product ? 'Product updated' : 'Product added', !product && saved?.barcode && !barcode.trim()
+        ? { description: `Barcode ${saved.barcode} was generated. Edit the product to print its label.` }
+        : undefined);
       onSaved();
     } catch (e: any) { toast.error(e?.message || 'Failed to save product'); }
     finally { setSaving(false); }
@@ -256,12 +272,39 @@ export default function ProductDialog({ open, onClose, product, onSaved, initial
           </div>
 
           <div className="grid gap-1.5">
-            <Label>Barcode <span className="text-muted-foreground text-xs font-normal">(optional, the number under the bars)</span></Label>
+            <Label>Barcode</Label>
             <div className="flex gap-2">
-              <Input value={barcode} onChange={e => setBarcode(e.target.value)} placeholder="e.g. 8901030865278" className="font-mono" inputMode="numeric" />
+              <Input
+                value={barcode}
+                onChange={e => setBarcode(e.target.value)}
+                placeholder={product ? 'Scan, type, or generate' : 'Leave blank to auto-generate'}
+                className="font-mono"
+                inputMode="numeric"
+              />
+              <Button type="button" variant="outline" size="icon" onClick={handleGenerateBarcode} disabled={generating} title="Generate a barcode" aria-label="Generate a barcode">
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+              </Button>
               <ScanButton onClick={() => setScannerOpen(true)} label="Scan barcode with camera" />
             </div>
+            <p className="text-xs text-muted-foreground">
+              Product already has a barcode on its packaging? Scan it. Otherwise one is created for you (starting with 200) and you can print it as a sticker.
+            </p>
+            {barcodePreview && (
+              <div className="flex items-center gap-3 rounded-lg border bg-white p-2">
+                <div className="flex-1 min-w-0 h-16 flex items-center justify-center [&_svg]:max-h-full [&_svg]:max-w-full" dangerouslySetInnerHTML={{ __html: barcodePreview }} />
+                <Button type="button" variant="outline" size="sm" onClick={() => setLabelsOpen(true)} disabled={!name.trim()}>
+                  <Printer className="w-3.5 h-3.5 mr-1.5" />Print label
+                </Button>
+              </div>
+            )}
           </div>
+          <PrintLabelsDialog
+            open={labelsOpen}
+            onOpenChange={setLabelsOpen}
+            count={1}
+            title={`Labels for ${name.trim() || 'product'}`}
+            items={[{ name: name.trim(), barcode: barcode.trim(), price: sellingPrice ? Number(sellingPrice) : null }]}
+          />
           <BarcodeScannerDialog
             open={scannerOpen}
             onOpenChange={setScannerOpen}

@@ -34,6 +34,8 @@ export const getTopSellingProducts = () => call('getTopSellingProducts', {});
 export const saveProduct = (input: any) => call('saveProduct', input);
 export const deleteProduct = (input: any) => call('deleteProduct', input);
 export const findProductByCode = (input: { code: string }) => call<any, any>('findProductByCode', input);
+export const generateBarcode = () => call<any, { barcode: string }>('generateBarcode', {});
+export const generateMissingBarcodes = () => call<any, { count: number }>('generateMissingBarcodes', {});
 export const saveSalesTarget = (input: { revenueTarget: number; profitTarget: number; month?: string }) => call<any, any>('saveSalesTarget', input);
 
 export const getMovements = (input: any) => call('getMovements', input);
@@ -90,7 +92,7 @@ export const recordPayout = (input: any) => call('admin/recordPayout', input);
 export const deletePayout = (input: any) => call('admin/deletePayout', input);
 
 export const api = {
-  getProducts, saveProduct, deleteProduct, globalSearch, getTopSellingProducts, findProductByCode, saveSalesTarget,
+  getProducts, saveProduct, deleteProduct, globalSearch, getTopSellingProducts, findProductByCode, saveSalesTarget, generateBarcode, generateMissingBarcodes,
   getMovements, recordStockMovement,
   getSales, recordSale, deleteSale,
   getExpenses, saveExpense, deleteExpense,
